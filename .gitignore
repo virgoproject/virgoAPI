@@ -1,0 +1,7 @@
+/bin/
+/target/
+/.classpath
+/.project
+/currentPeers.txt
+/oldPeers.txt
+/recentPeers.txt
