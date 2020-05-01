@@ -3,7 +3,6 @@ package io.virgo.virgoAPI.requestsResponses;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import io.virgo.virgoAPI.data.AddressBalance;
 import io.virgo.virgoAPI.data.AddressTxs;
 import net.holm.geoWeb.ResponseCode;
 

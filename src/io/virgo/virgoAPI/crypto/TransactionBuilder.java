@@ -8,17 +8,16 @@ import java.util.HashMap;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import io.virgo.virgoAPI.BoltAPI;
+import io.virgo.virgoAPI.VirgoAPI;
 import io.virgo.virgoAPI.data.AddressTxs;
 import io.virgo.virgoAPI.data.TransactionState;
 import io.virgo.virgoAPI.requestsResponses.GetAddressesTxsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
-import net.boltLabs.boltCryptoLib.Converter;
-import net.boltLabs.boltCryptoLib.ECDSA;
-import net.boltLabs.boltCryptoLib.ECDSASignature;
-import net.boltLabs.boltCryptoLib.Sha256;
-import net.boltLabs.boltCryptoLib.Sha256Hash;
+import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.ECDSASignature;
+import io.virgo.virgoCryptoLib.Sha256;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import net.holm.geoWeb.Peer;
 import net.holm.geoWeb.ResponseCode;
 import net.holm.geoWeb.SyncMessageResponse;
@@ -44,22 +43,25 @@ public class TransactionBuilder {
 		return this;
 	}
 	
-	public JSONObject send() throws IOException {
+	public JSONObject send(byte[] privateKey) throws IOException {
 		if(address == null)
 			throw new IllegalStateException("no address defined");
 		
 		if(outputs.size() <= 0)
 			throw new IllegalStateException("no output defined");
 		
+		if(!address.checkAgainstPrivateKey(privateKey))
+			throw new IllegalArgumentException("Given private key doesn't correspond to given address");
+		
 		String[] addr = {address.getAddress()};
-		GetAddressesTxsResponse addrTxsResp = BoltAPI.getInstance().getAddressesTxs(addr);
+		GetAddressesTxsResponse addrTxsResp = VirgoAPI.getInstance().getAddressesTxs(addr);
 		
 		if(addrTxsResp.getResponseCode() != ResponseCode.OK)
 			throw new IOException("Unable to get address transactions from remote");
 		
 		AddressTxs addrTxs = addrTxsResp.getAddressTxs(address.getAddress());
 		
-		GetTxsStateResponse txsStateResp = BoltAPI.getInstance().getTxsState(addrTxs.getInputs());
+		GetTxsStateResponse txsStateResp = VirgoAPI.getInstance().getTxsState(addrTxs.getInputs());
 		
 		if(txsStateResp.getResponseCode() != ResponseCode.OK)
 			throw new IOException("Unable to get transactions states from remote");
@@ -85,7 +87,7 @@ public class TransactionBuilder {
 		for(TxOutput output : outputs.values())
 			outputsValue += output.getAmount();
 				
-		if(inputsValue-outputsValue*BoltAPI.FEES_RATE < outputsValue)
+		if(inputsValue-outputsValue*VirgoAPI.FEES_RATE < outputsValue)
 			throw new IllegalArgumentException("Trying to spend more than allowed ("+outputsValue+" / " + inputsValue +")");
 		else if(inputsValue > outputsValue) {
 			outputs.put(address.getAddress(), new TxOutput(address.getAddress(),inputsValue-outputsValue-(long)(outputsValue/200)));
@@ -93,7 +95,7 @@ public class TransactionBuilder {
 		}
 			
 		
-		GetTipsResponse getTipsResp = BoltAPI.getInstance().getTips();
+		GetTipsResponse getTipsResp = VirgoAPI.getInstance().getTips();
 		if(getTipsResp.getResponseCode() != ResponseCode.OK)
 			throw new IOException("Unable to get last tips from remote");
 		
@@ -109,14 +111,14 @@ public class TransactionBuilder {
 		
 		transaction.put("date", System.currentTimeMillis());
 		
-		transaction.put("pubKey", Converter.bytesToHex(address.getPublicKey()));
+		transaction.put("pubKey", Converter.bytesToHex(address.getPublicKey(privateKey)));
 		
 		Sha256Hash txHash = Sha256.getHash((transaction.getJSONArray("parents").toString() +
 				transaction.getJSONArray("inputs").toString() +
 				outputsJSON.toString())
 				.getBytes());
 		
-		ECDSASignature sig = address.sign(txHash);
+		ECDSASignature sig = address.sign(txHash, privateKey);
 		transaction.put("sig", sig.toHexString());
 		
 		JSONObject txMessage = new JSONObject();
@@ -124,11 +126,11 @@ public class TransactionBuilder {
 		txMessage.put("tx", transaction);
 		txMessage.put("callback", true);
 		
-		Peer bestPeer = BoltAPI.getInstance().getPeersWatcher().getPeersByScore().get(0);
+		Peer bestPeer = VirgoAPI.getInstance().getPeersWatcher().getPeersByScore().get(0);
 		
 		SyncMessageResponse txSubmissionResp = bestPeer.sendSyncMessage(txMessage);
 		if(txSubmissionResp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT && txSubmissionResp.getResponse().getBoolean("result") == true) {
-			BoltAPI.getInstance().broadCast(txMessage, Arrays.asList(new Peer[] {bestPeer}) );
+			VirgoAPI.getInstance().broadCast(txMessage, Arrays.asList(new Peer[] {bestPeer}) );
 			return transaction;
 		}
 		

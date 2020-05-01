@@ -3,7 +3,7 @@ package io.virgo.virgoAPI.network;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import io.virgo.virgoAPI.BoltAPI;
+import io.virgo.virgoAPI.VirgoAPI;
 import net.holm.geoWeb.Peer;
 
 public class MessageHandler extends net.holm.geoWeb.MessageHandler {
@@ -18,7 +18,7 @@ public class MessageHandler extends net.holm.geoWeb.MessageHandler {
 			case "nodeInfos":
 				System.out.println("nodeInfos received");
 				System.out.println(messageJson.toString());
-				BoltAPI.getInstance().getPeersWatcher().setScore(peer, messageJson.getInt("DAGHeight"));
+				VirgoAPI.getInstance().getPeersWatcher().setScore(peer, messageJson.getInt("DAGHeight"));
 				break;
 			}
 			

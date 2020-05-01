@@ -2,9 +2,10 @@ package io.virgo.virgoAPI.crypto;
 
 import java.math.BigInteger;
 
-import io.virgo.virgoAPI.BoltAPI;
+import io.virgo.virgoAPI.VirgoAPI;
 import io.virgo.virgoAPI.utils.Miscellaneous;
-import net.boltLabs.boltCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.Utils;
 
 public class TxOutput {
 
@@ -13,7 +14,7 @@ public class TxOutput {
 	private boolean isSpent;
 	
 	public TxOutput(String address, long amount) {
-		if(!Miscellaneous.validateAddress(address, BoltAPI.ADDR_IDENTIFIER))
+		if(!Utils.validateAddress(address, VirgoAPI.ADDR_IDENTIFIER))
 			throw new IllegalArgumentException(address + " is not a valid address");
 		
 		if(!Miscellaneous.validateAmount(amount))
@@ -44,11 +45,11 @@ public class TxOutput {
 		
 		switch(outArgs.length) {
 		case 2:
-			if(Miscellaneous.validateAddress(outArgs[0], BoltAPI.ADDR_IDENTIFIER))
+			if(Utils.validateAddress(outArgs[0], VirgoAPI.ADDR_IDENTIFIER))
 				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact());
 			break;
 		case 3:
-			if(Miscellaneous.validateAddress(outArgs[0], BoltAPI.ADDR_IDENTIFIER) && Miscellaneous.validateAddress(outArgs[2], BoltAPI.TX_IDENTIFIER))
+			if(Utils.validateAddress(outArgs[0], VirgoAPI.ADDR_IDENTIFIER) && Utils.validateAddress(outArgs[2], VirgoAPI.TX_IDENTIFIER))
 				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact());
 		}
 		

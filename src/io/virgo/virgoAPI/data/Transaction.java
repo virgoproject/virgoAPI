@@ -6,8 +6,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.virgoAPI.crypto.TxOutput;
-import net.boltLabs.boltCryptoLib.Converter;
-import net.boltLabs.boltCryptoLib.ECDSASignature;
+import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.ECDSASignature;
 
 public class Transaction {
 

@@ -13,7 +13,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import io.virgo.virgoAPI.crypto.Address;
 import io.virgo.virgoAPI.crypto.TxOutput;
 import io.virgo.virgoAPI.data.AddressBalance;
 import io.virgo.virgoAPI.data.AddressTxs;
@@ -30,20 +29,21 @@ import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTransactionResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
 import io.virgo.virgoAPI.utils.Miscellaneous;
-import net.boltLabs.boltCryptoLib.Converter;
-import net.boltLabs.boltCryptoLib.ECDSA;
-import net.boltLabs.boltCryptoLib.ECDSASignature;
-import net.boltLabs.boltCryptoLib.Sha256;
-import net.boltLabs.boltCryptoLib.Sha256Hash;
+import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.ECDSA;
+import io.virgo.virgoCryptoLib.ECDSASignature;
+import io.virgo.virgoCryptoLib.Sha256;
+import io.virgo.virgoCryptoLib.Sha256Hash;
+import io.virgo.virgoCryptoLib.Utils;
 import net.holm.geoWeb.GeoWeb;
 import net.holm.geoWeb.ResponseCode;
 import net.holm.geoWeb.Peer;
 import net.holm.geoWeb.SyncMessageResponse;
 import net.holm.geoWeb.exceptions.PortUnavailableException;
 
-public class BoltAPI {
+public class VirgoAPI {
 
-	private static BoltAPI instance;
+	private static VirgoAPI instance;
 	private GeoWeb geoWeb;
 	private PeersWatcher peersWatcher;
 	private CustomEventListener eventListener;
@@ -55,7 +55,7 @@ public class BoltAPI {
 	public static final byte[] TX_IDENTIFIER = new BigInteger("3823").toByteArray();
 	public static final float FEES_RATE = 0.005f;
 	
-	private BoltAPI(Builder builder) throws IOException, PortUnavailableException {
+	private VirgoAPI(Builder builder) throws IOException, PortUnavailableException {
 		instance = this;
 		
 		GeoWeb.Builder geoWebBuilder = new GeoWeb.Builder();
@@ -105,7 +105,7 @@ public class BoltAPI {
 					for(int i = 0; i < tipsJSON.length(); i++) {
 						String tip = tipsJSON.getString(i);
 						
-						if(Miscellaneous.validateAddress(tip, TX_IDENTIFIER))
+						if(Utils.validateAddress(tip, TX_IDENTIFIER))
 							responseTips.add(tip);
 						else break;
 						
@@ -125,12 +125,12 @@ public class BoltAPI {
 	
 	public GetTransactionResponse getTransaction(String txId) {
 		
-		if(!Miscellaneous.validateAddress(txId, BoltAPI.TX_IDENTIFIER))
+		if(!Utils.validateAddress(txId, VirgoAPI.TX_IDENTIFIER))
 			return new GetTransactionResponse(ResponseCode.BAD_REQUEST, null);
 		
 		if(txId.equals("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN")) {//if genesis
 			HashMap<String, TxOutput> genesisOutputs = new HashMap<String, TxOutput>();
-			genesisOutputs.put("BoLT9o1RJKSSaTq1AWE4sQ3SbWFVkUvRuVEQq", new TxOutput("BoLT9o1RJKSSaTq1AWE4sQ3SbWFVkUvRuVEQq",BoltAPI.TOTALUNITS));
+			genesisOutputs.put("BoLT9o1RJKSSaTq1AWE4sQ3SbWFVkUvRuVEQq", new TxOutput("BoLT9o1RJKSSaTq1AWE4sQ3SbWFVkUvRuVEQq",VirgoAPI.TOTALUNITS));
 			
 			return new GetTransactionResponse(ResponseCode.OK,
 					new Transaction("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN",null,null,null,null, genesisOutputs, 0));
@@ -160,7 +160,7 @@ public class BoltAPI {
 					if(getTxResp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT) {
 						
 						JSONObject txJson = getTxResp.getResponse().getJSONObject("tx");
-						String receivedTxUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), BoltAPI.TX_IDENTIFIER);
+						String receivedTxUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), VirgoAPI.TX_IDENTIFIER);
 
 						if(receivedTxUid.equals(txId)) {
 
@@ -181,7 +181,7 @@ public class BoltAPI {
 							ArrayList<String> inputsArray = new ArrayList<String>();
 							for(int i = 0; i < inputs.length(); i++) {
 								String inputTx = inputs.getString(i);
-								if(!Miscellaneous.validateAddress(inputTx, BoltAPI.TX_IDENTIFIER))
+								if(!Utils.validateAddress(inputTx, VirgoAPI.TX_IDENTIFIER))
 									break;
 								
 								inputsArray.add(inputTx);
@@ -190,7 +190,7 @@ public class BoltAPI {
 							ArrayList<String> parentsArray = new ArrayList<String>();
 							for(int i = 0; i < parents.length(); i++) {
 								String parentTx = parents.getString(i);
-								if(!Miscellaneous.validateAddress(parentTx, BoltAPI.TX_IDENTIFIER))
+								if(!Utils.validateAddress(parentTx, VirgoAPI.TX_IDENTIFIER))
 									break;
 								
 								parentsArray.add(parentTx);
@@ -234,7 +234,7 @@ public class BoltAPI {
 		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
 		
 		for(String address : addresses) {
-			if(!Miscellaneous.validateAddress(address, ADDR_IDENTIFIER))
+			if(!Utils.validateAddress(address, ADDR_IDENTIFIER))
 				throw new IllegalArgumentException(address + " is not a valid address");
 		}
 		
@@ -267,7 +267,7 @@ public class BoltAPI {
 							ArrayList<String> inputsArray = new ArrayList<String>();
 							for(int i2 = 0; i2 < inputs.length(); i2++) {
 								String inputTx = inputs.getString(i2);
-								if(!Miscellaneous.validateAddress(inputTx, BoltAPI.TX_IDENTIFIER))
+								if(!Utils.validateAddress(inputTx, VirgoAPI.TX_IDENTIFIER))
 									break;
 								
 								inputsArray.add(inputTx);
@@ -276,7 +276,7 @@ public class BoltAPI {
 							ArrayList<String> outputsArray = new ArrayList<String>();
 							for(int i2 = 0; i2 < outputs.length(); i2++) {
 								String outputTx = outputs.getString(i2);
-								if(!Miscellaneous.validateAddress(outputTx, BoltAPI.TX_IDENTIFIER))
+								if(!Utils.validateAddress(outputTx, VirgoAPI.TX_IDENTIFIER))
 									break;
 								
 								outputsArray.add(outputTx);
@@ -308,7 +308,7 @@ public class BoltAPI {
 		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
 		
 		for(String address : addresses) {
-			if(!Miscellaneous.validateAddress(address, ADDR_IDENTIFIER))
+			if(!Utils.validateAddress(address, ADDR_IDENTIFIER))
 				throw new IllegalArgumentException(address + " is not a valid address");
 		}
 		
@@ -356,7 +356,7 @@ public class BoltAPI {
 		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
 		
 		for(String txUid : txsUids) {
-			if(!Miscellaneous.validateAddress(txUid, TX_IDENTIFIER))
+			if(!Utils.validateAddress(txUid, TX_IDENTIFIER))
 				throw new IllegalArgumentException(txUid + " is not a valid transaction identifier");
 		}
 		
@@ -425,17 +425,11 @@ public class BoltAPI {
 		return new GetTxsStateResponse(ResponseCode.NOT_FOUND, null);
 	}
 	
-	public static Address generateNewAddress() {
-		byte[] pKey = ECDSA.generatePrivateKey();
-		
-		return new Address(pKey);
-	}
-	
 	public CustomEventListener getEventListener() {
 		return eventListener;
 	}
 	
-	public static BoltAPI getInstance() {
+	public static VirgoAPI getInstance() {
 		return instance;
 	}
 	
@@ -444,12 +438,12 @@ public class BoltAPI {
 		private int port = 25565;
 		private CustomEventListener eventListener;
 		
-		public BoltAPI build() throws IOException, PortUnavailableException {
+		public VirgoAPI build() throws IOException, PortUnavailableException {
 			
 			if(eventListener == null)
 				eventListener = new CustomEventListener();
 			
-			return new BoltAPI(this);
+			return new VirgoAPI(this);
 		}
 		
 		public Builder port(int port) {
