@@ -1,7 +1,7 @@
 package io.virgo.virgoAPI.requestsResponses;
 
 import io.virgo.virgoAPI.data.Transaction;
-import net.holm.geoWeb.ResponseCode;
+import io.virgo.geoWeb.ResponseCode;
 
 public class GetTransactionResponse extends RequestResponse {
 

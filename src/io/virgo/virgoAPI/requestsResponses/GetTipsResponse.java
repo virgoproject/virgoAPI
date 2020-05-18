@@ -2,7 +2,7 @@ package io.virgo.virgoAPI.requestsResponses;
 
 import java.util.ArrayList;
 
-import net.holm.geoWeb.ResponseCode;
+import io.virgo.geoWeb.ResponseCode;
 
 public class GetTipsResponse extends RequestResponse {
 

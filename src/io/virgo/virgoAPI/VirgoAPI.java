@@ -28,18 +28,17 @@ import io.virgo.virgoAPI.requestsResponses.GetBalancesResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTransactionResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
-import io.virgo.virgoAPI.utils.Miscellaneous;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSA;
 import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoCryptoLib.Utils;
-import net.holm.geoWeb.GeoWeb;
-import net.holm.geoWeb.ResponseCode;
-import net.holm.geoWeb.Peer;
-import net.holm.geoWeb.SyncMessageResponse;
-import net.holm.geoWeb.exceptions.PortUnavailableException;
+import io.virgo.geoWeb.GeoWeb;
+import io.virgo.geoWeb.ResponseCode;
+import io.virgo.geoWeb.Peer;
+import io.virgo.geoWeb.SyncMessageResponse;
+import io.virgo.geoWeb.exceptions.PortUnavailableException;
 
 public class VirgoAPI {
 
@@ -51,7 +50,7 @@ public class VirgoAPI {
 	public static final int DECIMALS = 8;
 	public static final int TOTALCOINS = 32032000;
 	public static final long TOTALUNITS = (long) (TOTALCOINS * Math.pow(10, DECIMALS));
-	public static final byte[] ADDR_IDENTIFIER = new BigInteger("19879").toByteArray();
+	public static final byte[] ADDR_IDENTIFIER = new BigInteger("4039").toByteArray();
 	public static final byte[] TX_IDENTIFIER = new BigInteger("3823").toByteArray();
 	public static final float FEES_RATE = 0.005f;
 	
@@ -130,10 +129,10 @@ public class VirgoAPI {
 		
 		if(txId.equals("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN")) {//if genesis
 			HashMap<String, TxOutput> genesisOutputs = new HashMap<String, TxOutput>();
-			genesisOutputs.put("BoLT9o1RJKSSaTq1AWE4sQ3SbWFVkUvRuVEQq", new TxOutput("BoLT9o1RJKSSaTq1AWE4sQ3SbWFVkUvRuVEQq",VirgoAPI.TOTALUNITS));
+			genesisOutputs.put("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv",VirgoAPI.TOTALUNITS));
 			
 			return new GetTransactionResponse(ResponseCode.OK,
-					new Transaction("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN",null,null,null,null, genesisOutputs, 0));
+					new Transaction("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN",null,null,new String[0],new String[0], genesisOutputs, 0));
 		}
 		
 		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
@@ -431,6 +430,10 @@ public class VirgoAPI {
 	
 	public static VirgoAPI getInstance() {
 		return instance;
+	}
+	
+	public void shutdown() {
+		geoWeb.shutdown();
 	}
 	
 	public static class Builder {

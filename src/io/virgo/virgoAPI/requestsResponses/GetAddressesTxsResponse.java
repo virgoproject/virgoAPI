@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import io.virgo.virgoAPI.data.AddressTxs;
-import net.holm.geoWeb.ResponseCode;
+import io.virgo.geoWeb.ResponseCode;
 
 public class GetAddressesTxsResponse extends RequestResponse {
 

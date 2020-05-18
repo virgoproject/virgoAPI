@@ -4,9 +4,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import io.virgo.virgoAPI.VirgoAPI;
-import net.holm.geoWeb.Peer;
+import io.virgo.geoWeb.Peer;
 
-public class MessageHandler extends net.holm.geoWeb.MessageHandler {
+public class MessageHandler extends io.virgo.geoWeb.MessageHandler {
 	
 	@Override
 	public void onMessage(JSONObject messageJson, Peer peer) {

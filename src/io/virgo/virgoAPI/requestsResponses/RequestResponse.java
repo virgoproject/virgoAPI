@@ -1,6 +1,6 @@
 package io.virgo.virgoAPI.requestsResponses;
 
-import net.holm.geoWeb.ResponseCode;
+import io.virgo.geoWeb.ResponseCode;
 
 public abstract class RequestResponse {
 

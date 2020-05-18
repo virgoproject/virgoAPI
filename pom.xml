@@ -23,18 +23,25 @@
         <url>http://54.190.55.105/nexus/content/repositories/releases/</url>
     </repository>
 </repositories>
-  <dependencies>	
+  <dependencies>
+  
+  	<dependency>
+	    <groupId>org.json</groupId>
+	    <artifactId>json</artifactId>
+	    <version>20180813</version>
+	</dependency>
+  
 	<dependency>
 	  <groupId>io.virgo</groupId>
 	  <artifactId>virgoCryptoLib</artifactId>
 	  <version>0.0.3</version>
 	</dependency>
 	
-	<!-- <dependency>
-	  <groupId>net.holm</groupId>
+	<dependency>
+	  <groupId>io.virgo</groupId>
 	  <artifactId>geoWeb</artifactId>
-	  <version>0.0.1</version>
-	</dependency>-->
+	  <version>0.0.4b</version>
+	</dependency>
 
   </dependencies>
 </project>

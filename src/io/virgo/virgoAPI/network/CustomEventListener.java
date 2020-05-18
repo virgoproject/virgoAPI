@@ -1,8 +1,8 @@
 package io.virgo.virgoAPI.network;
 
-import net.holm.geoWeb.events.PeerConnectionEvent;
-import net.holm.geoWeb.events.PeerDisconnectionEvent;
-import net.holm.geoWeb.events.PeerHandshakedEvent;
+import io.virgo.geoWeb.events.PeerConnectionEvent;
+import io.virgo.geoWeb.events.PeerDisconnectionEvent;
+import io.virgo.geoWeb.events.PeerHandshakedEvent;
 
 public class CustomEventListener {
 

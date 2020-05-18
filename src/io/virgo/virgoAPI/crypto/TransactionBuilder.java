@@ -18,9 +18,9 @@ import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
-import net.holm.geoWeb.Peer;
-import net.holm.geoWeb.ResponseCode;
-import net.holm.geoWeb.SyncMessageResponse;
+import io.virgo.geoWeb.Peer;
+import io.virgo.geoWeb.ResponseCode;
+import io.virgo.geoWeb.SyncMessageResponse;
 
 public class TransactionBuilder {
 

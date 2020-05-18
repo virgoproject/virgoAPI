@@ -8,7 +8,7 @@ import java.util.List;
 
 import org.json.JSONObject;
 
-import net.holm.geoWeb.Peer;
+import io.virgo.geoWeb.Peer;
 
 public class PeersWatcher {
 

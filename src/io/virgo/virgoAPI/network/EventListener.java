@@ -1,11 +1,11 @@
 package io.virgo.virgoAPI.network;
 
 import io.virgo.virgoAPI.VirgoAPI;
-import net.holm.geoWeb.events.PeerConnectionEvent;
-import net.holm.geoWeb.events.PeerDisconnectionEvent;
-import net.holm.geoWeb.events.PeerHandshakedEvent;
+import io.virgo.geoWeb.events.PeerConnectionEvent;
+import io.virgo.geoWeb.events.PeerDisconnectionEvent;
+import io.virgo.geoWeb.events.PeerHandshakedEvent;
 
-public class EventListener extends net.holm.geoWeb.events.EventListener {
+public class EventListener extends io.virgo.geoWeb.events.EventListener {
 	
 	@Override
 	public void onPeerConnection(PeerConnectionEvent event) {
