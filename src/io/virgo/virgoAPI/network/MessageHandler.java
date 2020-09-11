@@ -10,7 +10,6 @@ public class MessageHandler extends io.virgo.geoWeb.MessageHandler {
 	
 	@Override
 	public void onMessage(JSONObject messageJson, Peer peer) {
-		System.out.println("ss"+messageJson.toString());
 		try {
 			
 			switch(messageJson.getString("command")) {

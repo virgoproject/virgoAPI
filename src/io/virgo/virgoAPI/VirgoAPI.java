@@ -170,10 +170,12 @@ public class VirgoAPI {
 							JSONArray inputs = txJson.getJSONArray("inputs");
 							JSONArray outputs = txJson.getJSONArray("outputs");
 							
+							long date = txJson.getLong("date");
+							
 							ECDSA signer = new ECDSA();
 							
 							//check if signature is good
-							Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString()).getBytes());
+							Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
 							if(!signer.Verify(TxHash, sig, pubKey))
 								break;
 
@@ -204,13 +206,15 @@ public class VirgoAPI {
 								}catch(IllegalArgumentException e) {
 									break;
 								}
-							}							
+							}
+							
+							
 
 							if(inputsArray.size() == inputs.length() && parentsArray.size() == parents.length()
 									&& outputsArray.size() == outputs.length()) {
 								
 								Transaction tx = new Transaction(receivedTxUid, sig, pubKey,
-										parentsArray.toArray(new String[0]), inputsArray.toArray(new String[0]), outputsArray, System.currentTimeMillis());
+										parentsArray.toArray(new String[0]), inputsArray.toArray(new String[0]), outputsArray, date);
 																
 								return new GetTransactionResponse(ResponseCode.OK, tx);
 								

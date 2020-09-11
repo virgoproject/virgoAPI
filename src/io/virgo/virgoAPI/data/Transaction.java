@@ -5,6 +5,7 @@ import java.util.HashMap;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import io.virgo.virgoAPI.VirgoAPI;
 import io.virgo.virgoAPI.crypto.TxOutput;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSASignature;
@@ -43,6 +44,15 @@ public class Transaction {
 	
 	public byte[] getPublicKey() {
 		return pubKey;
+	}
+	
+	public String getAddress() {
+		byte[] pubKey = getPublicKey();
+		
+		if(pubKey == null)
+			return "";
+		
+		return Converter.Addressify(pubKey, VirgoAPI.ADDR_IDENTIFIER);
 	}
 	
 	public String[] getParentsUids() {

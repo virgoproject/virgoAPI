@@ -109,13 +109,16 @@ public class TransactionBuilder {
 		}
 		transaction.put("outputs", outputsJSON);
 		
-		transaction.put("date", System.currentTimeMillis());
+		long date = System.currentTimeMillis();
+		
+		transaction.put("date", date);
 		
 		transaction.put("pubKey", Converter.bytesToHex(address.getPublicKey(privateKey)));
 		
 		Sha256Hash txHash = Sha256.getHash((transaction.getJSONArray("parents").toString() +
 				transaction.getJSONArray("inputs").toString() +
-				outputsJSON.toString())
+				outputsJSON.toString() + 
+				date)
 				.getBytes());
 		
 		ECDSASignature sig = address.sign(txHash, privateKey);
