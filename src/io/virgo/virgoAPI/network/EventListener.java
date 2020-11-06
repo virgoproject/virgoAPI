@@ -5,6 +5,10 @@ import io.virgo.geoWeb.events.PeerConnectionEvent;
 import io.virgo.geoWeb.events.PeerDisconnectionEvent;
 import io.virgo.geoWeb.events.PeerHandshakedEvent;
 
+/**
+ * Custom handler for GeoWeb events, you can use theses events
+ * by extending {@link CustomEventListener} and override the events you want
+ */
 public class EventListener extends io.virgo.geoWeb.events.EventListener {
 	
 	@Override
@@ -26,6 +30,7 @@ public class EventListener extends io.virgo.geoWeb.events.EventListener {
 	public void onPeerHandshaked(PeerHandshakedEvent event) {
 		System.out.println("handshaked");
 		
+		//update peer score based on the informations it provided
 		VirgoAPI.getInstance().getPeersWatcher().requestScoreUpdate(event.getPeer());
 		
 		VirgoAPI.getInstance().getEventListener().onPeerHandshaked(event);

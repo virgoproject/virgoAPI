@@ -1,5 +1,8 @@
 package io.virgo.virgoAPI.requestsResponses;
 
+/**
+ * ENUM of the type of API request
+ */
 public enum RequestType {
 	GET_TIPS,
 	GET_TXS_STATE,

@@ -8,6 +8,10 @@ import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoCryptoLib.Utils;
 
+/**
+ * Object representing an address, with utils to sign messages and check a privateKey against it
+ */
+//TODO: Complete it to be more like the VirgoWallet one ?
 public class Address {
 
 	private String address;

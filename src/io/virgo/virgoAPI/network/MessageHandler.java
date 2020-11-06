@@ -6,6 +6,9 @@ import org.json.JSONObject;
 import io.virgo.virgoAPI.VirgoAPI;
 import io.virgo.geoWeb.Peer;
 
+/**
+ * Custom handler for GeoWeb messages
+ */
 public class MessageHandler extends io.virgo.geoWeb.MessageHandler {
 	
 	@Override
@@ -14,6 +17,7 @@ public class MessageHandler extends io.virgo.geoWeb.MessageHandler {
 			
 			switch(messageJson.getString("command")) {
 			
+			//update score when receiving nodeInfos
 			case "nodeInfos":
 				System.out.println("nodeInfos received");
 				System.out.println(messageJson.toString());

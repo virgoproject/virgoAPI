@@ -4,6 +4,9 @@ import java.util.ArrayList;
 
 import io.virgo.geoWeb.ResponseCode;
 
+/**
+ * Object representing the response to a GetTips request
+ */
 public class GetTipsResponse extends RequestResponse {
 
 	private ArrayList<String> tips;
@@ -14,6 +17,9 @@ public class GetTipsResponse extends RequestResponse {
 		this.tips = tips;
 	}
 	
+	/**
+	 * @return A list of the tips found
+	 */
 	public ArrayList<String> getTips() {
 		return tips;
 	}

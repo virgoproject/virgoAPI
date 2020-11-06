@@ -40,6 +40,9 @@ import io.virgo.geoWeb.Peer;
 import io.virgo.geoWeb.SyncMessageResponse;
 import io.virgo.geoWeb.exceptions.PortUnavailableException;
 
+/**
+ * Java library to interact with the Virgo network
+ */
 public class VirgoAPI {
 
 	private static VirgoAPI instance;
@@ -54,6 +57,9 @@ public class VirgoAPI {
 	public static final byte[] TX_IDENTIFIER = new BigInteger("3823").toByteArray();
 	public static final float FEES_RATE = 0.005f;
 	
+	/**
+	 * Create a new virgoAPI instance from builder
+	 */
 	private VirgoAPI(Builder builder) throws IOException, PortUnavailableException {
 		instance = this;
 		
@@ -68,35 +74,28 @@ public class VirgoAPI {
 		eventListener = builder.eventListener;
 	}
 	
-	public boolean connectTo(String hostname, int port) {
-		return geoWeb.connectTo(hostname, port);
-				
-	}
-	
-	public void broadCast(JSONObject txMessage) {
-		geoWeb.broadCast(txMessage);
-	}
-	
-	public void broadCast(JSONObject message, List<Peer> peersToIgnore) {
-		geoWeb.broadCast(message, peersToIgnore);
-	}
-	
-	public void broadCast(JSONObject message, Collection<Peer> targetPeers) {
-		geoWeb.broadCast(message, targetPeers);
-	}
-	
+	/**
+	 * Get tips transactions from peers<br>
+	 * Will only return result from the most up-to-date peer
+	 * 
+	 * @return {@link GetTipsResponse} containing the request result
+	 */
 	public GetTipsResponse getTips() {
 		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
 		
+		//prepare getTips message, same for all peers
 		JSONObject getTipsRequest = new JSONObject();
 		getTipsRequest.put("command", "getTips");
 		
+		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
 		while(peers.hasNext()) {
 			Peer peer = peers.next();
 			
+			//send request
 			SyncMessageResponse resp = peer.sendSyncMessage(getTipsRequest);
 			if(resp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT) {
 				
+				//if got a response check for data validity
 				try {
 					ArrayList<String> responseTips = new ArrayList<String>();
 					JSONArray tipsJSON = resp.getResponse().getJSONArray("tips");
@@ -110,6 +109,7 @@ public class VirgoAPI {
 						
 					}
 					
+					//if everything is good return peer response, else goto next iteration
 					if(!responseTips.isEmpty())
 						return new GetTipsResponse(ResponseCode.OK, responseTips);
 					
@@ -118,16 +118,25 @@ public class VirgoAPI {
 			}
 			
 		}
-				
+		
+		//If nothing has been returned yet return 404 NOT FOUND error
 		return new GetTipsResponse(ResponseCode.NOT_FOUND, null);
 	}
 	
+	/**
+	 * Get a raw transaction from its identifier
+	 * 
+	 * @param txId The ID of the wanted transaction
+	 * @return {@link GetTransactionResponse} containing the request result
+	 */
 	public GetTransactionResponse getTransaction(String txId) {
 		
+		//First check if given identifier is valid, if not return 400 BAD_REQUEST
 		if(!Utils.validateAddress(txId, VirgoAPI.TX_IDENTIFIER))
 			return new GetTransactionResponse(ResponseCode.BAD_REQUEST, null);
 		
-		if(txId.equals("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN")) {//if genesis
+		//If wanted transaction is genesis reutrn it without consulting peers as it's hardcoded
+		if(txId.equals("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN")) {
 			HashMap<String, TxOutput> genesisOutputs = new HashMap<String, TxOutput>();
 			genesisOutputs.put("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv",VirgoAPI.TOTALUNITS));
 			
@@ -137,30 +146,39 @@ public class VirgoAPI {
 		
 		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
 		
+		//prepare askTx message, same for everyone
 		JSONObject askTxRequest = new JSONObject();
 		askTxRequest.put("command", "askTx");
 		askTxRequest.put("id", txId);
 		
+		//prepare getTx message, same for everyone
+		JSONObject getTxRequest = new JSONObject();
+		getTxRequest.put("command", "getTx");
+		getTxRequest.put("id", txId);
+		
+		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
 		while(peers.hasNext()) {
 			Peer peer = peers.next();
 			
+			//ask peer if it has the wanted transaction
 			SyncMessageResponse resp = peer.sendSyncMessage(askTxRequest);
+			
 			if(resp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT) {
 				
+				//If got a response and peer indicate that it has the wanted transaction
 				if(resp.getResponse().getString("command").equals("inv")
 						&& resp.getResponse().getString("id").equals(txId)) {
 					
-					JSONObject getTxRequest = new JSONObject();
-					getTxRequest.put("command", "getTx");
-					getTxRequest.put("id", txId);
-					
+					//ask peer to send transaction data
 					SyncMessageResponse getTxResp = peer.sendSyncMessage(getTxRequest);
 					
+					//If got a response check if given transaction is valid and the one we want
 					if(getTxResp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT) {
 						
 						JSONObject txJson = getTxResp.getResponse().getJSONObject("tx");
 						String receivedTxUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), VirgoAPI.TX_IDENTIFIER);
 
+						//check if given transaction has the same ID
 						if(receivedTxUid.equals(txId)) {
 
 							ECDSASignature sig = ECDSASignature.fromByteArray(Converter.hexToBytes(txJson.getString("sig")));
@@ -179,6 +197,7 @@ public class VirgoAPI {
 							if(!signer.Verify(TxHash, sig, pubKey))
 								break;
 
+							//clean and verify inputs
 							ArrayList<String> inputsArray = new ArrayList<String>();
 							for(int i = 0; i < inputs.length(); i++) {
 								String inputTx = inputs.getString(i);
@@ -188,6 +207,7 @@ public class VirgoAPI {
 								inputsArray.add(inputTx);
 							}
 
+							//clean and verify parents
 							ArrayList<String> parentsArray = new ArrayList<String>();
 							for(int i = 0; i < parents.length(); i++) {
 								String parentTx = parents.getString(i);
@@ -197,6 +217,7 @@ public class VirgoAPI {
 								parentsArray.add(parentTx);
 							}							
 
+							//clean and verify ouputs
 							HashMap<String, TxOutput> outputsArray = new HashMap<String, TxOutput>();
 							for(int i = 0; i < outputs.length(); i++) {
 								String outputString = outputs.getString(i);
@@ -208,8 +229,7 @@ public class VirgoAPI {
 								}
 							}
 							
-							
-
+							//If everything has been successfully verified return transaction, else goto next iteration
 							if(inputsArray.size() == inputs.length() && parentsArray.size() == parents.length()
 									&& outputsArray.size() == outputs.length()) {
 								
@@ -229,44 +249,60 @@ public class VirgoAPI {
 			}
 		}
 		
+		//If nothing has been returned yet return 404 NOT FOUND error
 		return new GetTransactionResponse(ResponseCode.NOT_FOUND, null);
 		
 	}
 	
+	
+	//TODO: Send the request to all peers and concatenate data to get more complete responses
+	/**
+	 * Get all transactions relative to given addresses
+	 * 
+	 * @param addresses An array of the addresses to fetch
+	 * @return {@link GetAddressesTxsResponse} Containing the transactions IDs corresponding to each addresses
+	 */
 	public GetAddressesTxsResponse getAddressesTxs(String[] addresses) {
 		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
 		
+		//Check if every given address is valid, if not throw an illegalArgumentException
 		for(String address : addresses) {
 			if(!Utils.validateAddress(address, ADDR_IDENTIFIER))
 				throw new IllegalArgumentException(address + " is not a valid address");
 		}
 		
+		//prepare getAddrTxs message as its the same for every peers
 		JSONObject getTxsRequest = new JSONObject();
 		getTxsRequest.put("command", "getAddrTxs");
 		getTxsRequest.put("addresses", new JSONArray(addresses));
 		
 		ArrayList<String> addrs = new ArrayList<String>(Arrays.asList(addresses));
 		
+		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
 		while(peers.hasNext()) {
 			Peer peer = peers.next();
 			
+			//send request
 			SyncMessageResponse resp = peer.sendSyncMessage(getTxsRequest);
-			
 			if(resp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT) {
 				
 				try {
 					JSONArray addressesTxs = resp.getResponse().getJSONArray("addrTxs");
 					
+					//valid transactions container
 					HashMap<String, AddressTxs> addressesTxsMap = new HashMap<String, AddressTxs>();
 					
+					//for each address
 					for(int i = 0; i < addressesTxs.length(); i++) {
 						JSONObject addrTxs = addressesTxs.getJSONObject(i);
 						
+						//check if we requested this address
 						if(addrs.contains(addrTxs.getString("address"))) {
 							
 							JSONArray inputs = addrTxs.getJSONArray("inputs");
 							JSONArray outputs = addrTxs.getJSONArray("outputs");
 							
+							//verify input txs
 							ArrayList<String> inputsArray = new ArrayList<String>();
 							for(int i2 = 0; i2 < inputs.length(); i2++) {
 								String inputTx = inputs.getString(i2);
@@ -276,6 +312,7 @@ public class VirgoAPI {
 								inputsArray.add(inputTx);
 							}
 							
+							//verify output txs
 							ArrayList<String> outputsArray = new ArrayList<String>();
 							for(int i2 = 0; i2 < outputs.length(); i2++) {
 								String outputTx = outputs.getString(i2);
@@ -285,6 +322,7 @@ public class VirgoAPI {
 								outputsArray.add(outputTx);
 							}
 							
+							//if everything good add data to the valid transactions container
 							if(inputs.length() == inputsArray.size() && outputs.length() == outputsArray.size()) {
 								addressesTxsMap.put(addrTxs.getString("address"), new AddressTxs(
 										addrTxs.getString("address"),
@@ -295,6 +333,7 @@ public class VirgoAPI {
 						}
 					}
 					
+					//If peer gave all addresses we wanted return everything 
 					if(addressesTxsMap.size() == addrs.size())
 						return new GetAddressesTxsResponse(ResponseCode.OK, addressesTxsMap);
 					
@@ -304,35 +343,49 @@ public class VirgoAPI {
 		
 		}
 		
+		//If nothing has been returned yet return 404 NOT FOUND error
 		return new GetAddressesTxsResponse(ResponseCode.NOT_FOUND, null);
 	}
 	
+	
+	/**
+	 * Get given addresses balances (sent and received)
+	 * Will only return result from the most up-to-date peer
+	 * 
+	 * @param addresses the addresses you want the balance of
+	 * @return {@link GetBalancesResponse} Containing the balances of each addresses
+	 */
 	public GetBalancesResponse getBalances(String[] addresses) {
 		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
 		
+		//Check if every given address is valid, if not throw an illegalArgumentException
 		for(String address : addresses) {
 			if(!Utils.validateAddress(address, ADDR_IDENTIFIER))
 				throw new IllegalArgumentException(address + " is not a valid address");
 		}
 		
+		//prepare getBalances message as its the same for every peer
 		JSONObject getBalancesRequest = new JSONObject();
 		getBalancesRequest.put("command", "getBalances");
 		getBalancesRequest.put("addresses", new JSONArray(addresses));
 		
 		ArrayList<String> addrs = new ArrayList<String>(Arrays.asList(addresses));
 		
+		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
 		while(peers.hasNext()) {
 			Peer peer = peers.next();
 			
+			//send request
 			SyncMessageResponse resp = peer.sendSyncMessage(getBalancesRequest);
-			
 			if(resp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT) {
 				
 				try {
 					JSONArray balances = resp.getResponse().getJSONArray("balances");
 					
+					//valid balances container
 					HashMap<String, AddressBalance> balancesMap = new HashMap<String, AddressBalance>();
 					
+					//check for validity of each received balance
 					for(int i = 0; i < balances.length(); i++) {
 						JSONObject balance = balances.getJSONObject(i);
 						
@@ -344,6 +397,7 @@ public class VirgoAPI {
 						}
 					}
 					
+					//if got all wanted balances return data, else goto next iteration
 					if(balancesMap.size() == addrs.size())
 						return new GetBalancesResponse(ResponseCode.OK, balancesMap);
 					
@@ -352,12 +406,22 @@ public class VirgoAPI {
 			}
 		}
 		
+		//If nothing has been returned yet return 404 NOT FOUND error
 		return new GetBalancesResponse(ResponseCode.NOT_FOUND, null);
 	}
 	
+	
+	/**
+	 * Get given transactions states (Status, stability, outputs states and values)
+	 * 
+	 * @param txsUids the IDs of the transactions you want the state of
+	 * @return {@link GetTxsStateResponse} Containing the states of each transactions
+	 */
+	//TODO: Refactor this shit, states shouldn't be got from different sources? not found states must be marked as not found, not fake data
 	public GetTxsStateResponse getTxsState(String[] txsUids) {
 		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
 		
+		//check if every transaction id is valid
 		for(String txUid : txsUids) {
 			if(!Utils.validateAddress(txUid, TX_IDENTIFIER))
 				throw new IllegalArgumentException(txUid + " is not a valid transaction identifier");
@@ -436,10 +500,83 @@ public class VirgoAPI {
 		return instance;
 	}
 	
+	
+	
+	/*--- geoWeb functions wrappers ---*/
+	
+	/**
+	 * Try to connect to a new peer
+	 * 
+	 * @param hostname the IP or domain name of the machine to connect to
+	 * @param port the port of the machine to connect to
+	 * @return true if connected, false otherwise
+	 */
+	public boolean connectTo(String hostname, int port) {
+		return geoWeb.connectTo(hostname, port);
+				
+	}
+	
+	/**
+	 * Send a message to all connected peers
+	 * 
+	 * @param message The message to send
+	 * <br>
+	 * The Json object must contain a string parameter called 'command' (witch is the subject of your message)
+	 * otherwise it will be ignored by peers
+	 */
+	public void broadCast(JSONObject txMessage) {
+		geoWeb.broadCast(txMessage);
+	}
+	
+	/**
+	 * Send a message to all connected peers except given one
+	 * 
+	 * @param message The message to send
+	 * @param peerToIgnore the peers to ignore
+	 * 
+	 * The Json object must contain a string parameter called 'command' (witch is the subject of your message)
+	 * otherwise it will be ignored by peers
+	 */
+	public void broadCast(JSONObject message, List<Peer> peersToIgnore) {
+		geoWeb.broadCast(message, peersToIgnore);
+	}
+	
+	/**
+	 * Send a message to target connected peers
+	 * 
+	 * @param message The message to send
+	 * @param targetPeers the peers to send a message to
+	 * 
+	 * The Json object must contain a string parameter called 'command' (witch is the subject of your message)
+	 * otherwise it will be ignored by peers
+	 */
+	public void broadCast(JSONObject message, Collection<Peer> targetPeers) {
+		geoWeb.broadCast(message, targetPeers);
+	}
+	
+	/**
+	 * Disconnect peers and close all running threads
+	 * virgoAPI will stop working after calling this function
+	 */
 	public void shutdown() {
 		geoWeb.shutdown();
 	}
 	
+	
+	
+	
+	/**
+	 * New virgoAPI instance builder
+	 * 
+	 * <p>
+	 * Example:<br><br>
+	 * {@code VirgoAPI api = new VirgoAPI.Builder()}<br>
+	 * {@code .eventListener(new CustomEventListener())}<br>
+	 * {@code .port(1234)}<br>
+	 * {@code .build();}
+	 * <p>
+	 * 
+	 */
 	public static class Builder {
 		
 		private int port = 25565;

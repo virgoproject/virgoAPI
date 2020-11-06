@@ -3,6 +3,9 @@ package io.virgo.virgoAPI.requestsResponses;
 import io.virgo.virgoAPI.data.Transaction;
 import io.virgo.geoWeb.ResponseCode;
 
+/**
+ * Object representing the response to a GetTransaction request
+ */
 public class GetTransactionResponse extends RequestResponse {
 
 	private Transaction transaction;
@@ -13,6 +16,9 @@ public class GetTransactionResponse extends RequestResponse {
 		this.transaction = transaction;
 	}
 	
+	/**
+	 * @return The desired {@link Transaction} if found, otherwise null
+	 */
 	public Transaction getTransaction() {
 		return transaction;
 	}
