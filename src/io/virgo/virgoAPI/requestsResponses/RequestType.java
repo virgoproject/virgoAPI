@@ -8,5 +8,5 @@ public enum RequestType {
 	GET_TXS_STATE,
 	GET_BALANCES,
 	GET_ADDR_TXS,
-	GET_TX
+	GET_TXS
 }

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 
@@ -26,7 +27,7 @@ import io.virgo.virgoAPI.network.PeersWatcher;
 import io.virgo.virgoAPI.requestsResponses.GetAddressesTxsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetBalancesResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
-import io.virgo.virgoAPI.requestsResponses.GetTransactionResponse;
+import io.virgo.virgoAPI.requestsResponses.GetTransactionsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSA;
@@ -129,119 +130,141 @@ public class VirgoAPI {
 	 * @param txId The ID of the wanted transaction
 	 * @return {@link GetTransactionResponse} containing the request result
 	 */
-	public GetTransactionResponse getTransaction(String txId) {
+	public GetTransactionsResponse getTransactions(Collection<String> txsIds) {
 		
-		//First check if given identifier is valid, if not return 400 BAD_REQUEST
-		if(!Utils.validateAddress(txId, VirgoAPI.TX_IDENTIFIER))
-			return new GetTransactionResponse(ResponseCode.BAD_REQUEST, null);
+		//remove duplicate entries from wanted transactions
+	    txsIds = new ArrayList<String>(
+	    	      new HashSet<String>(txsIds));
 		
-		//If wanted transaction is genesis reutrn it without consulting peers as it's hardcoded
-		if(txId.equals("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN")) {
-			HashMap<String, TxOutput> genesisOutputs = new HashMap<String, TxOutput>();
-			genesisOutputs.put("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv",VirgoAPI.TOTALUNITS));
-			
-			return new GetTransactionResponse(ResponseCode.OK,
-					new Transaction("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN",null,null,new String[0],new String[0], genesisOutputs, 0));
-		}
+		//First check if given ids are valid, if not return 400 BAD_REQUEST
+		for(String txId : txsIds)
+			if(!Utils.validateAddress(txId, VirgoAPI.TX_IDENTIFIER))
+			return new GetTransactionsResponse(ResponseCode.BAD_REQUEST, new HashMap<String, Transaction>());
 		
 		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
 		
-		//prepare askTx message, same for everyone
-		JSONObject askTxRequest = new JSONObject();
-		askTxRequest.put("command", "askTx");
-		askTxRequest.put("id", txId);
+		//prepare askTxs message, same for everyone
+		JSONObject askTxsRequest = new JSONObject();
+		askTxsRequest.put("command", "askTxs");
+		askTxsRequest.put("ids", new JSONArray(txsIds));
 		
-		//prepare getTx message, same for everyone
-		JSONObject getTxRequest = new JSONObject();
-		getTxRequest.put("command", "getTx");
-		getTxRequest.put("id", txId);
+		HashMap<String, Transaction> foundTransactions = new HashMap<String, Transaction>();
+		
+		//if one wanted transaction is genesis get it without consulting peers as it's hardcoded
+		if(txsIds.contains("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN")) {
+			HashMap<String, TxOutput> genesisOutputs = new HashMap<String, TxOutput>();
+			genesisOutputs.put("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv",VirgoAPI.TOTALUNITS));
+			
+			foundTransactions.put("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN", new Transaction("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN",null,null,new String[0],new String[0], genesisOutputs, 0));
+			txsIds.remove("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN");
+		}
+		
 		
 		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
-		while(peers.hasNext()) {
+		while(peers.hasNext() && !foundTransactions.keySet().containsAll(txsIds)) {
 			Peer peer = peers.next();
 			
 			//ask peer if it has the wanted transaction
-			SyncMessageResponse resp = peer.sendSyncMessage(askTxRequest);
+			SyncMessageResponse resp = peer.sendSyncMessage(askTxsRequest);
 			
 			if(resp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT) {
 				
 				//If got a response and peer indicate that it has the wanted transaction
-				if(resp.getResponse().getString("command").equals("inv")
-						&& resp.getResponse().getString("id").equals(txId)) {
+				if(resp.getResponse().getString("command").equals("inv")) {
+					
+					ArrayList<String> desiredTxs = new ArrayList<String>();
+					
+					JSONArray invitedTxs = resp.getResponse().getJSONArray("ids");
+					
+					//Remove unwanted and already obtained txs from invivation
+					for(int i = 0; i < invitedTxs.length(); i++) {
+						String invitedTx = invitedTxs.getString(i);
+						if(txsIds.contains(invitedTx) && !foundTransactions.containsKey(invitedTx) && !desiredTxs.contains(invitedTx))
+							desiredTxs.add(invitedTx);
+					}
 					
 					//ask peer to send transaction data
-					SyncMessageResponse getTxResp = peer.sendSyncMessage(getTxRequest);
+					JSONObject getTxsRequest = new JSONObject();
+					getTxsRequest.put("command", "getTxs");
+					getTxsRequest.put("ids", new JSONArray(desiredTxs));
+					SyncMessageResponse getTxsResp = peer.sendSyncMessage(getTxsRequest);
 					
 					//If got a response check if given transaction is valid and the one we want
-					if(getTxResp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT) {
+					if(getTxsResp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT) {
 						
-						JSONObject txJson = getTxResp.getResponse().getJSONObject("tx");
-						String receivedTxUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), VirgoAPI.TX_IDENTIFIER);
-
-						//check if given transaction has the same ID
-						if(receivedTxUid.equals(txId)) {
-
-							ECDSASignature sig = ECDSASignature.fromByteArray(Converter.hexToBytes(txJson.getString("sig")));
-							byte[] pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
+						JSONArray txs = getTxsResp.getResponse().getJSONArray("txs");
+						
+						for(int i = 0; i < txs.length(); i++) {
+							JSONObject txJson = txs.getJSONObject(i);
 							
-							JSONArray parents = txJson.getJSONArray("parents");
-							JSONArray inputs = txJson.getJSONArray("inputs");
-							JSONArray outputs = txJson.getJSONArray("outputs");
+							String receivedTxUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), VirgoAPI.TX_IDENTIFIER);
 							
-							long date = txJson.getLong("date");
-							
-							ECDSA signer = new ECDSA();
-							
-							//check if signature is good
-							Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
-							if(!signer.Verify(TxHash, sig, pubKey))
-								break;
-
-							//clean and verify inputs
-							ArrayList<String> inputsArray = new ArrayList<String>();
-							for(int i = 0; i < inputs.length(); i++) {
-								String inputTx = inputs.getString(i);
-								if(!Utils.validateAddress(inputTx, VirgoAPI.TX_IDENTIFIER))
-									break;
+							//check if given transaction is desired
+							if(desiredTxs.contains(receivedTxUid)) {
+	
+								ECDSASignature sig = ECDSASignature.fromByteArray(Converter.hexToBytes(txJson.getString("sig")));
+								byte[] pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
 								
-								inputsArray.add(inputTx);
-							}
-
-							//clean and verify parents
-							ArrayList<String> parentsArray = new ArrayList<String>();
-							for(int i = 0; i < parents.length(); i++) {
-								String parentTx = parents.getString(i);
-								if(!Utils.validateAddress(parentTx, VirgoAPI.TX_IDENTIFIER))
-									break;
+								JSONArray parents = txJson.getJSONArray("parents");
+								JSONArray inputs = txJson.getJSONArray("inputs");
+								JSONArray outputs = txJson.getJSONArray("outputs");
 								
-								parentsArray.add(parentTx);
-							}							
-
-							//clean and verify ouputs
-							HashMap<String, TxOutput> outputsArray = new HashMap<String, TxOutput>();
-							for(int i = 0; i < outputs.length(); i++) {
-								String outputString = outputs.getString(i);
-								try {
-									TxOutput output = TxOutput.fromString(outputString);
-									outputsArray.put(output.getAddress(), output);
-								}catch(IllegalArgumentException e) {
-									break;
+								long date = txJson.getLong("date");
+								
+								ECDSA signer = new ECDSA();
+								
+								//check if signature is good
+								Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
+								if(!signer.Verify(TxHash, sig, pubKey))
+									continue;
+	
+								//clean and verify inputs
+								ArrayList<String> inputsArray = new ArrayList<String>();
+								for(int i2 = 0; i2 < inputs.length(); i2++) {
+									String inputTx = inputs.getString(i2);
+									if(!Utils.validateAddress(inputTx, VirgoAPI.TX_IDENTIFIER))
+										break;
+									
+									inputsArray.add(inputTx);
 								}
-							}
-							
-							//If everything has been successfully verified return transaction, else goto next iteration
-							if(inputsArray.size() == inputs.length() && parentsArray.size() == parents.length()
-									&& outputsArray.size() == outputs.length()) {
+	
+								//clean and verify parents
+								ArrayList<String> parentsArray = new ArrayList<String>();
+								for(int i2 = 0; i2 < parents.length(); i2++) {
+									String parentTx = parents.getString(i2);
+									if(!Utils.validateAddress(parentTx, VirgoAPI.TX_IDENTIFIER))
+										break;
+									
+									parentsArray.add(parentTx);
+								}							
+	
+								//clean and verify ouputs
+								HashMap<String, TxOutput> outputsArray = new HashMap<String, TxOutput>();
+								for(int i2 = 0; i2 < outputs.length(); i2++) {
+									String outputString = outputs.getString(i2);
+									try {
+										TxOutput output = TxOutput.fromString(outputString);
+										outputsArray.put(output.getAddress(), output);
+									}catch(IllegalArgumentException e) {
+										break;
+									}
+								}
 								
-								Transaction tx = new Transaction(receivedTxUid, sig, pubKey,
-										parentsArray.toArray(new String[0]), inputsArray.toArray(new String[0]), outputsArray, date);
-																
-								return new GetTransactionResponse(ResponseCode.OK, tx);
+								//If everything has been successfully verified add transaction, else goto next iteration
+								if(inputsArray.size() == inputs.length() && parentsArray.size() == parents.length()
+										&& outputsArray.size() == outputs.length()) {
+									
+									Transaction tx = new Transaction(receivedTxUid, sig, pubKey,
+											parentsArray.toArray(new String[0]), inputsArray.toArray(new String[0]), outputsArray, date);
+																	
+									foundTransactions.put(receivedTxUid, tx);
+									
+									//remove tx from desired transactions as we got it
+									desiredTxs.remove(receivedTxUid);
+								}
 								
 							}
-							
 						}
-						
 					}
 					
 				}
@@ -249,8 +272,11 @@ public class VirgoAPI {
 			}
 		}
 		
+		if(foundTransactions.size() != 0)
+			return new GetTransactionsResponse(ResponseCode.OK, foundTransactions);
+		
 		//If nothing has been returned yet return 404 NOT FOUND error
-		return new GetTransactionResponse(ResponseCode.NOT_FOUND, null);
+		return new GetTransactionsResponse(ResponseCode.NOT_FOUND, new HashMap<String, Transaction>());
 		
 	}
 	

@@ -171,8 +171,8 @@ public class TransactionBuilder {
 		
 		//Create tx message to send to peers
 		JSONObject txMessage = new JSONObject();
-		txMessage.put("command", "tx");
-		txMessage.put("tx", transaction);
+		txMessage.put("command", "txs");
+		txMessage.put("txs", new JSONArray(Arrays.asList(transaction)));
 		txMessage.put("callback", true);
 		
 		//broadcast it and return raw transaction
