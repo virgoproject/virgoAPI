@@ -12,7 +12,7 @@ public class TransactionState {
 	private boolean found;
 	private String uid;
 	private TxStatus status;
-	private int stability;
+	private int confirmations;
 	private HashMap<String, TxOutput> outputs;
 	
 	/**
@@ -23,10 +23,10 @@ public class TransactionState {
 	 * @param outputs Target transaction's outputs
 	 * @param found Has the transaction been found
 	 */
-	public TransactionState(String uid, TxStatus status, int stability, HashMap<String, TxOutput> outputs, boolean found) {
+	public TransactionState(String uid, TxStatus status, int confirmations, HashMap<String, TxOutput> outputs, boolean found) {
 		this.uid = uid;
 		this.status = status;
-		this.stability = stability;
+		this.confirmations = confirmations;
 		this.outputs = outputs;
 		this.found = found;
 	}
@@ -57,8 +57,8 @@ public class TransactionState {
 	 * @return The transaction's stability
 	 * Note: This doesn't update, if you want newer data request it again using the API
 	 */
-	public int getStability() {
-		return stability;
+	public int getConfirmations() {
+		return confirmations;
 	}
 	
 	/**

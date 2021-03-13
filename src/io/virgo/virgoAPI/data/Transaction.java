@@ -27,6 +27,9 @@ public class Transaction {
 	
 	private long date;
 	
+	private String parentBeacon;
+	private long nonce;
+	
 	/**
 	 * @param uid The transaction ID
 	 * @param signature The transaction signature
@@ -36,7 +39,7 @@ public class Transaction {
 	 * @param outputs The transaction outputs
 	 * @param date The transaction date
 	 */
-	public Transaction(String uid, ECDSASignature signature, byte[] pubKey, String[] parents, String[] inputs, HashMap<String, TxOutput> outputs, long date) {
+	public Transaction(String uid, ECDSASignature signature, byte[] pubKey, String[] parents, String[] inputs, HashMap<String, TxOutput> outputs, String parentBeacon, long nonce, long date) {
 		this.uid = uid;
 		this.signature = signature;
 		this.pubKey = pubKey;
@@ -110,11 +113,19 @@ public class Transaction {
 		return outputs.get(address);
 	}
 	
+	public String getParentBeacon() {
+		return parentBeacon;
+	}
+	
 	/**
 	 * @return The transaction's emission date
 	 */
 	public long getDate() {
 		return date;
+	}
+	
+	public long getNonce() {
+		return nonce;
 	}
 	
 	/**

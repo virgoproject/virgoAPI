@@ -14,10 +14,12 @@ import io.virgo.virgoAPI.data.TransactionState;
 import io.virgo.virgoAPI.requestsResponses.GetAddressesTxsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
+import io.virgo.virgoAPI.utils.Miscellaneous;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
+import io.virgo.virgoCryptoLib.Utils;
 import io.virgo.geoWeb.Peer;
 import io.virgo.geoWeb.ResponseCode;
 import io.virgo.geoWeb.SyncMessageResponse;
@@ -39,7 +41,11 @@ import io.virgo.geoWeb.SyncMessageResponse;
 public class TransactionBuilder {
 
 	private Address address = null;
+	private ArrayList<String> parents = new ArrayList<String>();
+	private ArrayList<String> inputs = new ArrayList<String>();
 	private HashMap<String, TxOutput> outputs = new HashMap<String, TxOutput>();
+	
+	private boolean validateAmounts = true;
 	
 	public TransactionBuilder() {
 		
@@ -58,6 +64,40 @@ public class TransactionBuilder {
 	}
 	
 	/**
+	 * Add the provided Transaction to the new one's parents
+	 * <br><br>
+	 * Manually adding parents will disable automatic addition of valid ones.<br>
+	 * If you just want to send basic transactions no need to use this method
+	 * 
+	 * @param txId The transaction to add as parent
+	 * @return The current TransactionBuilder
+	 */
+	public TransactionBuilder parent(String txId) {
+		assert(Utils.validateAddress(txId, VirgoAPI.TX_IDENTIFIER));
+		
+		parents.add(txId);
+		
+		return this;
+	}
+	
+	/**
+	 * Add the provided Transaction to the new one's inputs
+	 * <br><br>
+	 * Manually adding inputs will disable automatic addition of valid ones.<br>
+	 * If you just want to send basic transactions no need to use this method
+	 * 
+	 * @param txId The transaction to add as input
+	 * @return The current TransactionBuilder
+	 */
+	public TransactionBuilder input(String txId) {
+		assert(Utils.validateAddress(txId, VirgoAPI.TX_IDENTIFIER));
+		
+		inputs.add(txId);
+		
+		return this;
+	}
+	
+	/**
 	 * Add an output to this transaction
 	 * 
 	 * @param output The {@link TxOutput} you want to add
@@ -65,6 +105,19 @@ public class TransactionBuilder {
 	 */
 	public TransactionBuilder output(TxOutput output) {
 		outputs.put(output.getAddress(), output);
+		
+		return this;
+	}
+	
+	/**
+	 * Enable or not checking if inputs have enough value for this transaction
+	 * Disabling this will prevent the builder from creating a return output
+	 * True by default
+	 * 
+	 * @return The current TransactionBuilder
+	 */
+	public TransactionBuilder validateAmounts(boolean validateAmounts) {
+		this.validateAmounts = validateAmounts;
 		
 		return this;
 	}
@@ -89,62 +142,77 @@ public class TransactionBuilder {
 		if(!address.checkAgainstPrivateKey(privateKey))
 			throw new IllegalArgumentException("Given private key doesn't correspond to given address");
 		
-		//Get address transactions from peers
-		String[] addr = {address.getAddress()};
-		GetAddressesTxsResponse addrTxsResp = VirgoAPI.getInstance().getAddressesTxs(addr);
-		
-		if(addrTxsResp.getResponseCode() != ResponseCode.OK)
-			throw new IOException("Unable to get address transactions from remote");
-		
-		AddressTxs addrTxs = addrTxsResp.getAddressTxs(address.getAddress());
-		
-		//Get retrieved transactions's states
-		GetTxsStateResponse txsStateResp = VirgoAPI.getInstance().getTxsState(addrTxs.getInputs());
-		
-		if(txsStateResp.getResponseCode() != ResponseCode.OK)
-			throw new IOException("Unable to get transactions states from remote");
-		
-		//From states, calculate how much is spendable
-		ArrayList<String> unspentInputs = new ArrayList<String>();
-		long inputsValue = 0;
-		
-		ArrayList<TransactionState> inputsState = txsStateResp.getStates();
-		for(TransactionState state : inputsState) {
-			try {
-				if(state.hasBeenFound() && !state.isOutputSpent(address.getAddress())) {
-					long amount = state.getOutput(address.getAddress()).getAmount();
-					unspentInputs.add(state.getUid());
-					inputsValue += amount;
-				}				
-			}catch(IllegalArgumentException e) {
-				System.out.println(e.getMessage());
-			}
-				
+		if(inputs.size() == 0) {
+			//Get address transactions from peers
+			String[] addr = {address.getAddress()};
+			GetAddressesTxsResponse addrTxsResp = VirgoAPI.getInstance().getAddressesTxs(addr);
+			
+			if(addrTxsResp.getResponseCode() != ResponseCode.OK)
+				throw new IOException("Unable to get address transactions from remote");
+			
+			AddressTxs addrTxs = addrTxsResp.getAddressTxs(address.getAddress());
+			
+			inputs.addAll(Arrays.asList(addrTxs.getInputs()));
 		}
 		
-		//Calculate how much we try to spend
-		long outputsValue = 0;
-		for(TxOutput output : outputs.values())
-			outputsValue += output.getAmount();
-				
+		if(inputs.size() == 0)
+			throw new IllegalStateException("No input transaction found");
 		
-		//If we are trying to spend more than allowed throw an error
-		if(inputsValue-outputsValue*VirgoAPI.FEES_RATE < outputsValue)
-			throw new IllegalArgumentException("Trying to spend more than allowed ("+outputsValue+" / " + inputsValue +")");
+		ArrayList<String> unspentInputs = new ArrayList<String>();
 		
-		//If we are spending less than allowed create an output to get back whats remain
-		else if(inputsValue > outputsValue)
-			outputs.put(address.getAddress(), new TxOutput(address.getAddress(),inputsValue-outputsValue-(long)(outputsValue/200)));
+		//amounts verification process, make sure we don't try to spend more than allowed and that we are not paying more fees than needed
+		if(validateAmounts) {
+			//Get inputs states
+			GetTxsStateResponse txsStateResp = VirgoAPI.getInstance().getTxsState(inputs.toArray(new String[inputs.size()]));
 			
+			if(txsStateResp.getResponseCode() != ResponseCode.OK)
+				throw new IOException("Unable to get transactions states from remote");
+			
+			//From states, calculate how much is spendable
+			long inputsValue = 0;
+			
+			ArrayList<TransactionState> inputsState = txsStateResp.getStates();
+			for(TransactionState state : inputsState) {
+				try {
+					if(state.hasBeenFound() && !state.isOutputSpent(address.getAddress())) {
+						long amount = state.getOutput(address.getAddress()).getAmount();
+						unspentInputs.add(state.getUid());
+						inputsValue += amount;
+					}				
+				}catch(IllegalArgumentException e) {
+					System.out.println(e.getMessage());
+				}
+					
+			}
+			
+			//Calculate how much we try to spend
+			long outputsValue = 0;
+			for(TxOutput output : outputs.values())
+				outputsValue += output.getAmount();
+					
+			//If we are trying to spend more than allowed throw an error
+			if(outputsValue > inputsValue)
+				throw new IllegalArgumentException("Trying to spend more than allowed ("+outputsValue+" / " + inputsValue +")");
+			
+			//If we are spending less than allowed create an output to get back whats remain
+			else if(outputsValue < inputsValue)
+				outputs.put(address.getAddress(), new TxOutput(address.getAddress(),inputsValue-outputsValue));
+		}else
+			unspentInputs.addAll(inputs);
 		
-		//Get the tips we will attach the transaction to from peers
-		GetTipsResponse getTipsResp = VirgoAPI.getInstance().getTips();
-		if(getTipsResp.getResponseCode() != ResponseCode.OK)
-			throw new IOException("Unable to get last tips from remote");
+		
+		if(parents.size() == 0) {
+			//Get the tips we will attach the transaction to from peers
+			GetTipsResponse getTipsResp = VirgoAPI.getInstance().getTips();
+			if(getTipsResp.getResponseCode() != ResponseCode.OK)
+				throw new IOException("Unable to get last tips from remote");
+			
+			parents.addAll(getTipsResp.getTips());
+		}
 		
 		//Create the transaction JSON
 		JSONObject transaction = new JSONObject();
-		transaction.put("parents", new JSONArray(getTipsResp.getTips()));
+		transaction.put("parents", new JSONArray(parents));
 		transaction.put("inputs", new JSONArray(unspentInputs));
 		
 		JSONArray outputsJSON = new JSONArray();
@@ -159,7 +227,7 @@ public class TransactionBuilder {
 		
 		transaction.put("pubKey", Converter.bytesToHex(address.getPublicKey(privateKey)));
 		
-		Sha256Hash txHash = Sha256.getHash((transaction.getJSONArray("parents").toString() +
+		Sha256Hash txHash = Sha256.getDoubleHash((transaction.getJSONArray("parents").toString() +
 				transaction.getJSONArray("inputs").toString() +
 				outputsJSON.toString() + 
 				date)

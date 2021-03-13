@@ -34,13 +34,13 @@
 	<dependency>
 	  <groupId>io.virgo</groupId>
 	  <artifactId>virgoCryptoLib</artifactId>
-	  <version>0.0.3</version>
+	  <version>0.0.5</version>
 	</dependency>
 	
 	<dependency>
 	  <groupId>io.virgo</groupId>
 	  <artifactId>geoWeb</artifactId>
-	  <version>0.0.7t</version>
+	  <version>0.0.8</version>
 	</dependency>
 
   </dependencies>

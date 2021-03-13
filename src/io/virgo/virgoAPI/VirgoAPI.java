@@ -26,6 +26,7 @@ import io.virgo.virgoAPI.network.MessageHandler;
 import io.virgo.virgoAPI.network.PeersWatcher;
 import io.virgo.virgoAPI.requestsResponses.GetAddressesTxsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetBalancesResponse;
+import io.virgo.virgoAPI.requestsResponses.GetPoWInformationsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTransactionsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
@@ -52,11 +53,8 @@ public class VirgoAPI {
 	private CustomEventListener eventListener;
 	
 	public static final int DECIMALS = 8;
-	public static final int TOTALCOINS = 32032000;
-	public static final long TOTALUNITS = (long) (TOTALCOINS * Math.pow(10, DECIMALS));
 	public static final byte[] ADDR_IDENTIFIER = new BigInteger("4039").toByteArray();
 	public static final byte[] TX_IDENTIFIER = new BigInteger("3823").toByteArray();
-	public static final float FEES_RATE = 0.005f;
 	
 	/**
 	 * Create a new virgoAPI instance from builder
@@ -150,12 +148,13 @@ public class VirgoAPI {
 		
 		HashMap<String, Transaction> foundTransactions = new HashMap<String, Transaction>();
 		
+		
 		//if one wanted transaction is genesis get it without consulting peers as it's hardcoded
 		if(txsIds.contains("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN")) {
 			HashMap<String, TxOutput> genesisOutputs = new HashMap<String, TxOutput>();
-			genesisOutputs.put("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv",VirgoAPI.TOTALUNITS));
+			genesisOutputs.put("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv",(long) (100000 * Math.pow(10, DECIMALS))));
 			
-			foundTransactions.put("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN", new Transaction("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN",null,null,new String[0],new String[0], genesisOutputs, 0));
+			foundTransactions.put("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN", new Transaction("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN",null,null,new String[0],new String[0], genesisOutputs, "", 0, 0));
 			txsIds.remove("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN");
 		}
 		
@@ -197,35 +196,59 @@ public class VirgoAPI {
 						for(int i = 0; i < txs.length(); i++) {
 							JSONObject txJson = txs.getJSONObject(i);
 							
-							String receivedTxUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), VirgoAPI.TX_IDENTIFIER);
+							String receivedTxUid;
+							
+							if(txJson.has("parentBeacon"))
+								receivedTxUid = Converter.Addressify(Sha256.getDoubleHash((txJson.getJSONArray("parents").toString()
+										+ txJson.getJSONArray("outputs").toString()
+										+ txJson.getString("parentBeacon")
+										+ txJson.getLong("date")
+										+ txJson.getLong("nonce")).getBytes()).toBytes(), TX_IDENTIFIER);
+							else
+								receivedTxUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), VirgoAPI.TX_IDENTIFIER);
 							
 							//check if given transaction is desired
 							if(desiredTxs.contains(receivedTxUid)) {
 	
-								ECDSASignature sig = ECDSASignature.fromByteArray(Converter.hexToBytes(txJson.getString("sig")));
-								byte[] pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
+								ECDSASignature sig = null;
+								byte[] pubKey = null;
 								
 								JSONArray parents = txJson.getJSONArray("parents");
-								JSONArray inputs = txJson.getJSONArray("inputs");
+								
+								ArrayList<String> inputsArray = new ArrayList<String>();
+								JSONArray inputs = new JSONArray();
+								if(!txJson.has("parentBeacon"))
+									inputs = txJson.getJSONArray("inputs");
+								
 								JSONArray outputs = txJson.getJSONArray("outputs");
 								
 								long date = txJson.getLong("date");
 								
+								String parentBeacon = "";
+								long nonce = 0;
+								
 								ECDSA signer = new ECDSA();
 								
 								//check if signature is good
-								Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
-								if(!signer.Verify(TxHash, sig, pubKey))
-									continue;
-	
-								//clean and verify inputs
-								ArrayList<String> inputsArray = new ArrayList<String>();
-								for(int i2 = 0; i2 < inputs.length(); i2++) {
-									String inputTx = inputs.getString(i2);
-									if(!Utils.validateAddress(inputTx, VirgoAPI.TX_IDENTIFIER))
-										break;
+								if(!txJson.has("parentBeacon")) {
+									 sig = ECDSASignature.fromByteArray(Converter.hexToBytes(txJson.getString("sig")));
+									 pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
 									
-									inputsArray.add(inputTx);
+									Sha256Hash TxHash = Sha256.getDoubleHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
+									if(!signer.Verify(TxHash, sig, pubKey))
+										continue;
+								
+									//clean and verify inputs
+									for(int i2 = 0; i2 < inputs.length(); i2++) {
+										String inputTx = inputs.getString(i2);
+										if(!Utils.validateAddress(inputTx, VirgoAPI.TX_IDENTIFIER))
+											break;
+										
+										inputsArray.add(inputTx);
+									}
+								}else {
+									parentBeacon = txJson.getString("parentBeacon");
+									nonce = txJson.getLong("nonce");
 								}
 	
 								//clean and verify parents
@@ -255,7 +278,7 @@ public class VirgoAPI {
 										&& outputsArray.size() == outputs.length()) {
 									
 									Transaction tx = new Transaction(receivedTxUid, sig, pubKey,
-											parentsArray.toArray(new String[0]), inputsArray.toArray(new String[0]), outputsArray, date);
+											parentsArray.toArray(new String[0]), inputsArray.toArray(new String[0]), outputsArray, parentBeacon, nonce, date);
 																	
 									foundTransactions.put(receivedTxUid, tx);
 									
@@ -475,7 +498,7 @@ public class VirgoAPI {
 						JSONObject state = txsState.getJSONObject(i);
 						
 						if(tbdStates.contains(state.getString("tx"))
-								&& !state.has("notLoaded") && state.has("status") && state.has("stability") && state.has("outputsState")) {
+								&& !state.has("notLoaded") && state.has("status") && state.has("confirmations") && state.has("outputsState")) {
 							
 							HashMap<String, TxOutput> outputsStateMap = new HashMap<String, TxOutput>();
 							JSONArray outputsState = state.getJSONArray("outputsState");
@@ -488,7 +511,7 @@ public class VirgoAPI {
 							states.put(state.getString("tx"), new TransactionState(
 									state.getString("tx"),
 									TxStatus.fromCode(state.getInt("status")),
-									state.getInt("stability"), outputsStateMap, true));
+									state.getInt("confirmations"), outputsStateMap, true));
 							
 							tbdStates.remove(state.getString("tx"));
 							
@@ -516,6 +539,41 @@ public class VirgoAPI {
 		}
 		
 		return new GetTxsStateResponse(ResponseCode.NOT_FOUND, null);
+	}
+	
+	public GetPoWInformationsResponse getPowInformations() {
+		Iterator<Peer> peers = getPeersWatcher().getPeersByScore().iterator();
+		
+		JSONObject request = new JSONObject();
+		request.put("command", "getPoWInformations");
+		
+		while(peers.hasNext()) {
+			Peer peer = peers.next();
+		
+			SyncMessageResponse resp = peer.sendSyncMessage(request);
+			if(resp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT) {
+				try {
+					
+					JSONArray parentsJSON = resp.getResponse().getJSONArray("parentTxs");
+					
+					ArrayList<String> parents = new ArrayList<String>();
+					for(int i = 0; i < parentsJSON.length(); i++)
+						parents.add(parentsJSON.getString(i));
+					
+					GetPoWInformationsResponse informations = new GetPoWInformationsResponse(ResponseCode.OK,
+							resp.getResponse().getString("parentBeacon"),
+							resp.getResponse().getLong("difficulty"),
+							parents
+							);
+					
+					return informations;
+					
+				}catch(JSONException e) { }
+			}
+		}
+		
+		return new GetPoWInformationsResponse(ResponseCode.NOT_FOUND, "", 0, null);
+		
 	}
 	
 	public CustomEventListener getEventListener() {

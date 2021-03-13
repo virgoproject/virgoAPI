@@ -10,7 +10,7 @@ public class Miscellaneous {
 	 * @return true if given amount is valid, false otherwise
 	 */
 	public static boolean validateAmount(long amount) {
-		if(amount <= 0 || amount > VirgoAPI.TOTALUNITS)
+		if(amount <= 0)
 			return false;
 		
 		return true;
