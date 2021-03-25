@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import io.virgo.virgoAPI.data.AddressBalance;
-import io.virgo.geoWeb.ResponseCode;
+import io.virgo.virgoAPI.network.ResponseCode;
 
 /**
  * Object representing the response to a GetBalances request

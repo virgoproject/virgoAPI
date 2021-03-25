@@ -2,7 +2,7 @@ package io.virgo.virgoAPI.requestsResponses;
 
 import java.util.ArrayList;
 
-import io.virgo.geoWeb.ResponseCode;
+import io.virgo.virgoAPI.network.ResponseCode;
 
 /**
  * Object representing the response to a GetTips request

@@ -1,11 +1,10 @@
 package io.virgo.virgoAPI.requestsResponses;
 
 import io.virgo.virgoAPI.data.Transaction;
+import io.virgo.virgoAPI.network.ResponseCode;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-
-import io.virgo.geoWeb.ResponseCode;
 
 /**
  * Object representing the response to a GetTransaction request

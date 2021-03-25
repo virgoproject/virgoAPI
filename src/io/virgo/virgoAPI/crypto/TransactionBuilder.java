@@ -11,6 +11,9 @@ import org.json.JSONObject;
 import io.virgo.virgoAPI.VirgoAPI;
 import io.virgo.virgoAPI.data.AddressTxs;
 import io.virgo.virgoAPI.data.TransactionState;
+import io.virgo.virgoAPI.network.Provider;
+import io.virgo.virgoAPI.network.Response;
+import io.virgo.virgoAPI.network.ResponseCode;
 import io.virgo.virgoAPI.requestsResponses.GetAddressesTxsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
@@ -20,9 +23,6 @@ import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoCryptoLib.Utils;
-import io.virgo.geoWeb.Peer;
-import io.virgo.geoWeb.ResponseCode;
-import io.virgo.geoWeb.SyncMessageResponse;
 
 /**
  * Builder to create a new transaction
@@ -152,7 +152,7 @@ public class TransactionBuilder {
 			
 			AddressTxs addrTxs = addrTxsResp.getAddressTxs(address.getAddress());
 			
-			inputs.addAll(Arrays.asList(addrTxs.getInputs()));
+			
 		}
 		
 		if(inputs.size() == 0)
@@ -237,20 +237,15 @@ public class TransactionBuilder {
 		ECDSASignature sig = address.sign(txHash, privateKey);
 		transaction.put("sig", sig.toHexString());
 		
-		//Create tx message to send to peers
-		JSONObject txMessage = new JSONObject();
-		txMessage.put("command", "txs");
-		txMessage.put("txs", new JSONArray(Arrays.asList(transaction)));
-		txMessage.put("callback", true);
-		
+		boolean ok = false;
 		//broadcast it and return raw transaction
-		Peer bestPeer = VirgoAPI.getInstance().getPeersWatcher().getPeersByScore().get(0);
-		
-		SyncMessageResponse txSubmissionResp = bestPeer.sendSyncMessage(txMessage);
-		if(txSubmissionResp.getResponseCode() != ResponseCode.REQUEST_TIMEOUT && txSubmissionResp.getResponse().getBoolean("result") == true) {
-			VirgoAPI.getInstance().broadCast(txMessage, Arrays.asList(new Peer[] {bestPeer}) );
-			return transaction;
+		for(Provider provider : VirgoAPI.getInstance().getProvidersWatcher().getProvidersByScore()) {
+			Response resp = provider.post("/tx", transaction.toString());
+			if(!ok && resp.getResponseCode() == ResponseCode.OK)
+				ok = true;
 		}
+		
+		if(ok) return transaction;
 		
 		return null;
 	}

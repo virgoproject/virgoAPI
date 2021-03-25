@@ -13,6 +13,7 @@ public class TransactionState {
 	private String uid;
 	private TxStatus status;
 	private int confirmations;
+	private String beacon;
 	private HashMap<String, TxOutput> outputs;
 	
 	/**
@@ -23,9 +24,10 @@ public class TransactionState {
 	 * @param outputs Target transaction's outputs
 	 * @param found Has the transaction been found
 	 */
-	public TransactionState(String uid, TxStatus status, int confirmations, HashMap<String, TxOutput> outputs, boolean found) {
+	public TransactionState(String uid, TxStatus status, String beacon, int confirmations, HashMap<String, TxOutput> outputs, boolean found) {
 		this.uid = uid;
 		this.status = status;
+		this.beacon = beacon;
 		this.confirmations = confirmations;
 		this.outputs = outputs;
 		this.found = found;
@@ -59,6 +61,14 @@ public class TransactionState {
 	 */
 	public int getConfirmations() {
 		return confirmations;
+	}
+	
+	/**
+	 * @return ID of the beacon that is confirming this transaction
+	 * Note: This doesn't update, if you want newer data request it again using the API
+	 */
+	public String getBeacon() {
+		return beacon;
 	}
 	
 	/**

@@ -1,6 +1,6 @@
 package io.virgo.virgoAPI.requestsResponses;
 
-import io.virgo.geoWeb.ResponseCode;
+import io.virgo.virgoAPI.network.ResponseCode;
 
 /**
  * Base request response object, basically an ENUM telling the request type and a response codes

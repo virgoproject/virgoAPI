@@ -4,8 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import io.virgo.virgoAPI.data.TransactionState;
-import io.virgo.geoWeb.ResponseCode;
-
+import io.virgo.virgoAPI.network.ResponseCode;
 /**
  * Object representing the response to a GetTxsState request
  */
