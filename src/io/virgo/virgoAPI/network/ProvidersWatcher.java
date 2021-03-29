@@ -5,6 +5,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Queue;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -17,7 +21,43 @@ public class ProvidersWatcher {
 	private volatile HashMap<Provider, Long> readyProviders = new HashMap<Provider, Long>();
 	private volatile ArrayList<Provider> pendingProviders = new ArrayList<Provider>();
 	
-	public ProvidersWatcher() {
+	private LinkedBlockingQueue<Provider> providersToCheck = new LinkedBlockingQueue<Provider>();
+	
+	private Thread pendingProvidersChecker;
+	
+	private Timer checkerTimer;
+	
+	public ProvidersWatcher(long checkRate) {
+		
+		checkerTimer = new Timer();
+		checkerTimer.scheduleAtFixedRate(new TimerTask() {
+
+			@Override
+			public void run() {
+				
+				for(Provider provider : pendingProviders)
+					if(!providersToCheck.contains(provider))
+						providersToCheck.add(provider);
+				
+				updateScores();
+			}
+			
+		}, 0, 10000);
+		
+		pendingProvidersChecker = new Thread(new Runnable() {
+
+			@Override
+			public void run() {
+				while(!Thread.interrupted())
+					try {
+						Provider provider = providersToCheck.take();
+						checkPendingProvider(provider);
+					} catch (InterruptedException e) {
+					}
+			}
+			
+		});
+		pendingProvidersChecker.start();
 		
 	}
 	
@@ -54,21 +94,18 @@ public class ProvidersWatcher {
 		return sortedProviders;
 	}
 	
-	public void makePendingProvidersReady() {
+	private void checkPendingProvider(Provider provider) {
 		
-		for(Provider provider : new ArrayList<Provider>(pendingProviders)) {
+		Response resp = provider.get("/nodeinfos");
+		
+		if(resp.getResponseCode() == ResponseCode.OK) {
 			
-			Response resp = provider.get("/nodeinfos");
+			try{
+				JSONObject state = new JSONObject(resp.getResponse());
+				readyProviders.put(provider, state.getLong("DAGWeight"));
+				pendingProviders.remove(provider);
+			}catch(JSONException e) {}
 			
-			if(resp.getResponseCode() == ResponseCode.OK) {
-				
-				try{
-					JSONObject state = new JSONObject(resp.getResponse());
-					readyProviders.put(provider, state.getLong("DAGWeight"));
-					pendingProviders.remove(provider);
-				}catch(JSONException e) {}
-				
-			}
 		}
 	}
 	
@@ -95,6 +132,16 @@ public class ProvidersWatcher {
 			}
 			
 		}
+	}
+	
+	public void addProvider(Provider provider) {
+		pendingProviders.add(0, provider);
+		
+	}
+
+	public void shutdown() {
+		checkerTimer.cancel();
+		pendingProvidersChecker.interrupt();
 	}
 	
 }

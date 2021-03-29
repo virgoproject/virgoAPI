@@ -151,8 +151,7 @@ public class TransactionBuilder {
 				throw new IOException("Unable to get address transactions from remote");
 			
 			AddressTxs addrTxs = addrTxsResp.getAddressTxs(address.getAddress());
-			
-			
+			inputs.addAll(Arrays.asList(addrTxs.getInputs()));
 		}
 		
 		if(inputs.size() == 0)

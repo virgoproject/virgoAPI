@@ -2,6 +2,7 @@ package io.virgo.virgoAPI;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -52,8 +53,19 @@ public class VirgoAPI {
 	 */
 	private VirgoAPI(Builder builder) throws IOException {
 		instance = this;
+		providersWatcher = new ProvidersWatcher(builder.checkRate);
+	}
+	
+	public void addProvider(URL hostname) {
+		String formatedHostname = hostname.getProtocol() + "://" + hostname.getHost();
 		
-		providersWatcher = new ProvidersWatcher();
+		if(hostname.getPort() == -1)
+			formatedHostname += ":"+hostname.getDefaultPort();
+		else
+			formatedHostname += ":"+hostname.getPort();
+		
+		Provider provider = new Provider(formatedHostname);
+		providersWatcher.addProvider(provider);
 	}
 	
 	/**
@@ -282,20 +294,33 @@ public class VirgoAPI {
 				if(resp.getResponseCode() == ResponseCode.OK) {
 					
 					try {
-						JSONArray transactionsJSON = new JSONArray(resp.getResponse());
+						JSONObject respJSON = new JSONObject(resp.getResponse());
 						
-						//verify txs
-						ArrayList<String> transactions = new ArrayList<String>();
-						for(int i = 0; i < transactionsJSON.length(); i++) {
-							String tx = transactionsJSON.getString(i);
+						JSONArray inputsJSON = respJSON.getJSONArray("inputs");
+						JSONArray outputsJSON = respJSON.getJSONArray("outputs");
+						
+						//verify inputs
+						ArrayList<String> inputs = new ArrayList<String>();
+						for(int i = 0; i < inputsJSON.length(); i++) {
+							String tx = inputsJSON.getString(i);
 							if(!Utils.validateAddress(tx, VirgoAPI.TX_IDENTIFIER))
 								break;
 							
-							transactions.add(tx);
+							inputs.add(tx);
 						}
 						
-						if(transactions.size() == transactionsJSON.length())
-							addressesTxsMap.put(address, new AddressTxs(address, transactions));
+						//verify outputs
+						ArrayList<String> outputs = new ArrayList<String>();
+						for(int i = 0; i < outputsJSON.length(); i++) {
+							String tx = outputsJSON.getString(i);
+							if(!Utils.validateAddress(tx, VirgoAPI.TX_IDENTIFIER))
+								break;
+							
+							outputs.add(tx);
+						}
+						
+						if(inputs.size() == inputsJSON.length() && outputs.size() == outputsJSON.length())
+							addressesTxsMap.put(address, new AddressTxs(address, inputs, outputs));
 						else break;
 							
 					}catch(JSONException e) {}
@@ -477,7 +502,9 @@ public class VirgoAPI {
 		return instance;
 	}
 	
-	
+	public void shutdown() {
+		providersWatcher.shutdown();
+	}
 	
 	/**
 	 * New virgoAPI instance builder
@@ -493,11 +520,16 @@ public class VirgoAPI {
 	 */
 	public static class Builder {
 		
+		private long checkRate = 10000;
+		
 		public VirgoAPI build() throws IOException {
-			
 			return new VirgoAPI(this);
 		}
 
+		public Builder providersUpdateRate(long rate) {
+			checkRate = rate;
+			return this;
+		}
 		
 	}
 

@@ -8,12 +8,14 @@ import java.util.ArrayList;
 public class AddressTxs {
 
 	private String address;
-	private ArrayList<String> transactions;
+	private ArrayList<String> inputs;
+	private ArrayList<String> outputs;
+
 	
-	
-	public AddressTxs(String address, ArrayList<String> transactions) {
+	public AddressTxs(String address, ArrayList<String> inputs, ArrayList<String> outputs) {
 		this.address = address;
-		this.transactions = transactions;
+		this.inputs = inputs;
+		this.outputs = outputs;
 	}
 	
 	/**
@@ -26,8 +28,15 @@ public class AddressTxs {
 	/**
 	 * @return The address's input transactions ids
 	 */
-	public String[] getTransactions() {
-		return transactions.toArray(new String[transactions.size()]);
+	public String[] getInputs() {
+		return inputs.toArray(new String[inputs.size()]);
+	}
+	
+	/**
+	 * @return The address's output transactions ids
+	 */
+	public String[] getOutputs() {
+		return outputs.toArray(new String[outputs.size()]);
 	}
 	
 }

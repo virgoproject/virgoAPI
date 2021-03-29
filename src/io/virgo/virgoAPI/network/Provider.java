@@ -11,7 +11,7 @@ public class Provider {
 
 	String hostname;
 	
-	Provider(String hostname) {
+	public Provider(String hostname) {
 		this.hostname = hostname;
 	}
 	
