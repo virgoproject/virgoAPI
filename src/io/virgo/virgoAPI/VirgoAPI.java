@@ -54,6 +54,9 @@ public class VirgoAPI {
 	private VirgoAPI(Builder builder) throws IOException {
 		instance = this;
 		providersWatcher = new ProvidersWatcher(builder.checkRate);
+		
+		for(URL providerHostname : builder.providers)
+			addProvider(providerHostname);
 	}
 	
 	public void addProvider(URL hostname) {
@@ -522,10 +525,17 @@ public class VirgoAPI {
 		
 		private long checkRate = 10000;
 		
+		private ArrayList<URL> providers = new ArrayList<URL>();
+		
 		public VirgoAPI build() throws IOException {
 			return new VirgoAPI(this);
 		}
 
+		public Builder provider(URL hostname) {
+			providers.add(hostname);
+			return this;
+		}
+		
 		public Builder providersUpdateRate(long rate) {
 			checkRate = rate;
 			return this;

@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -18,6 +17,8 @@ import org.json.JSONObject;
  */
 public class ProvidersWatcher {
 
+	private volatile ArrayList<String> providersIds = new ArrayList<String>();
+	
 	private volatile HashMap<Provider, Long> readyProviders = new HashMap<Provider, Long>();
 	private volatile ArrayList<Provider> pendingProviders = new ArrayList<Provider>();
 	
@@ -135,8 +136,11 @@ public class ProvidersWatcher {
 	}
 	
 	public void addProvider(Provider provider) {
-		pendingProviders.add(0, provider);
+		if(providersIds.contains(provider.hostname))
+			return;
 		
+		pendingProviders.add(0, provider);
+		providersIds.add(provider.hostname);
 	}
 
 	public void shutdown() {
