@@ -18,13 +18,6 @@ public class GetAddressesTxsResponse extends RequestResponse {
 		
 		addressesTxs = addressesTxsMap;
 	}
-
-	/**
-	 * @return An arrayList of {@link AddressTxs} for the target addresses 
-	 */
-	public ArrayList<AddressTxs> getAddressesTxs() {
-		return new ArrayList<AddressTxs>(addressesTxs.values());
-	}
 	
 	/**
 	 * Get the transactions about a specific address

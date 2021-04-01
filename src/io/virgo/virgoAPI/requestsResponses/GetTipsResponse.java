@@ -21,7 +21,7 @@ public class GetTipsResponse extends RequestResponse {
 	 * @return A list of the tips found
 	 */
 	public ArrayList<String> getTips() {
-		return tips;
+		return new ArrayList<String>(tips);
 	}
 	
 }

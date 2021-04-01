@@ -29,6 +29,7 @@ import io.virgo.virgoAPI.requestsResponses.GetPoWInformationsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTransactionsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
+import io.virgo.virgoAPI.requestsResponses.GetUnspentInputsResponse;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSA;
 import io.virgo.virgoCryptoLib.ECDSASignature;
@@ -339,6 +340,63 @@ public class VirgoAPI {
 		
 		//If nothing has been returned yet return 404 NOT FOUND error
 		return new GetAddressesTxsResponse(ResponseCode.NOT_FOUND, null);
+	}
+	
+	public GetUnspentInputsResponse getAddressesUnspentInputs(String[] addresses) {
+		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
+		
+		//Check if every given address is valid, if not throw an illegalArgumentException
+		for(String address : addresses) {
+			if(!Utils.validateAddress(address, ADDR_IDENTIFIER))
+				throw new IllegalArgumentException(address + " is not a valid address");
+		}
+		
+		//valid transactions container
+		HashMap<String, ArrayList<String>> addressesTxsMap = new HashMap<String, ArrayList<String>>();
+		
+		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
+		while(providers.hasNext()) {
+			Provider provider = providers.next();
+			
+			for(String address : addresses) {
+				if(addressesTxsMap.containsKey(address))
+					continue;
+				
+				Response resp = provider.get("/address/"+address+"/unspent");
+				
+				if(resp.getResponseCode() == ResponseCode.OK) {
+					
+					try {
+						
+						JSONArray inputsJSON = new JSONArray(resp.getResponse());
+						
+						//verify inputs
+						ArrayList<String> inputs = new ArrayList<String>();
+						for(int i = 0; i < inputsJSON.length(); i++) {
+							String tx = inputsJSON.getString(i);
+							if(!Utils.validateAddress(tx, VirgoAPI.TX_IDENTIFIER))
+								break;
+							
+							inputs.add(tx);
+						}
+						
+						if(inputs.size() == inputsJSON.length())
+							addressesTxsMap.put(address, inputs);
+						else break;
+							
+					}catch(JSONException e) {}
+					
+				}
+				
+			}
+			
+		}
+		
+		if(addressesTxsMap.size() != 0)
+			return new GetUnspentInputsResponse(ResponseCode.OK, addressesTxsMap);
+		
+		//If nothing has been returned yet return 404 NOT FOUND error
+		return new GetUnspentInputsResponse(ResponseCode.NOT_FOUND, null);
 	}
 	
 	
