@@ -436,7 +436,7 @@ public class VirgoAPI {
 							JSONArray outputsState = state.getJSONArray("outputsState");
 							for(int i = 0; i < outputsState.length(); i++) {
 								JSONObject outputState = outputsState.getJSONObject(i);
-								TxOutput output = new TxOutput(outputState.getString("address"), outputState.getLong("amount"), outputState.getBoolean("state"));
+								TxOutput output = new TxOutput(outputState.getString("address"), outputState.getLong("amount"), outputState.getBoolean("spent"));
 								outputsStateMap.put(output.getAddress(), output);
 							}
 							
