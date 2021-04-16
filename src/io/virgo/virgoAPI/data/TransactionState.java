@@ -2,6 +2,9 @@ package io.virgo.virgoAPI.data;
 
 import java.util.HashMap;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import io.virgo.virgoAPI.crypto.TxOutput;
 
 /**
@@ -9,7 +12,6 @@ import io.virgo.virgoAPI.crypto.TxOutput;
  */
 public class TransactionState {
 
-	private boolean found;
 	private String uid;
 	private TxStatus status;
 	private int confirmations;
@@ -24,20 +26,12 @@ public class TransactionState {
 	 * @param outputs Target transaction's outputs
 	 * @param found Has the transaction been found
 	 */
-	public TransactionState(String uid, TxStatus status, String beacon, int confirmations, HashMap<String, TxOutput> outputs, boolean found) {
+	public TransactionState(String uid, TxStatus status, String beacon, int confirmations, HashMap<String, TxOutput> outputs) {
 		this.uid = uid;
 		this.status = status;
 		this.beacon = beacon;
 		this.confirmations = confirmations;
 		this.outputs = outputs;
-		this.found = found;
-	}
-	
-	/**
-	 * @return If the transaction has been found on network, check this before reading any other data
-	 */
-	public boolean hasBeenFound() {
-		return found;
 	}
 	
 	/**
@@ -108,6 +102,37 @@ public class TransactionState {
 			return outputs.get(address).isSpent();
 		
 		throw new IllegalArgumentException("Output address " + address + " not found for transaction " + uid);
+	}
+	
+	public JSONObject toJSONObject() {
+		JSONObject JSONRepresentation = new JSONObject();
+		
+		JSONRepresentation.put("uid", uid);
+		JSONRepresentation.put("status", status.getCode());
+		JSONRepresentation.put("parentBeacon", beacon);
+		JSONRepresentation.put("confirmations", confirmations);
+
+		JSONArray outputsJSON = new JSONArray();
+		
+		for(TxOutput out : outputs.values()) {
+			outputsJSON.put(out.toJSONObject());
+		}
+		
+		JSONRepresentation.put("outputs", outputsJSON);
+		
+		return JSONRepresentation;
+	}
+	
+	public static TransactionState fromJSONObject(JSONObject JSONRepresentation) {
+		JSONArray outputsJSON = JSONRepresentation.getJSONArray("outputs");
+		
+		HashMap<String, TxOutput> outputs = new HashMap<String, TxOutput>();
+		for(int i = 0; i < outputsJSON.length(); i++) {
+			TxOutput output = TxOutput.fromJSONObject(outputsJSON.getJSONObject(i));
+			outputs.put(output.getAddress(), output);
+		}
+		
+		return new TransactionState(JSONRepresentation.getString("uid"), TxStatus.fromCode(JSONRepresentation.getInt("status")), JSONRepresentation.getString("parentBeacon"), JSONRepresentation.getInt("confirmations"), outputs);
 	}
 	
 }

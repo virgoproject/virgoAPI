@@ -29,7 +29,6 @@ import io.virgo.virgoAPI.requestsResponses.GetPoWInformationsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTransactionsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
-import io.virgo.virgoAPI.requestsResponses.GetUnspentInputsResponse;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSA;
 import io.virgo.virgoCryptoLib.ECDSASignature;
@@ -60,7 +59,7 @@ public class VirgoAPI {
 			addProvider(providerHostname);
 	}
 	
-	public void addProvider(URL hostname) {
+	public boolean addProvider(URL hostname) {
 		String formatedHostname = hostname.getProtocol() + "://" + hostname.getHost();
 		
 		if(hostname.getPort() == -1)
@@ -69,7 +68,15 @@ public class VirgoAPI {
 			formatedHostname += ":"+hostname.getPort();
 		
 		Provider provider = new Provider(formatedHostname);
-		providersWatcher.addProvider(provider);
+		return providersWatcher.addProvider(provider);
+	}
+	
+	public void removeProvider(String hostname) {
+		providersWatcher.removeProvider(hostname);
+	}
+	
+	public ArrayList<String> getProvidersIDs(){
+		return providersWatcher.getProvidersIDs();
 	}
 	
 	/**
@@ -176,79 +183,9 @@ public class VirgoAPI {
 						//check if given transaction is desired
 						if(txsIds.contains(receivedTxUid) && !foundTransactions.containsKey(txId)) {
 
-							ECDSASignature sig = null;
-							byte[] pubKey = null;
-							
-							JSONArray parents = txJson.getJSONArray("parents");
-							
-							ArrayList<String> inputsArray = new ArrayList<String>();
-							JSONArray inputs = new JSONArray();
-							if(!txJson.has("parentBeacon"))
-								inputs = txJson.getJSONArray("inputs");
-							
-							JSONArray outputs = txJson.getJSONArray("outputs");
-							
-							long date = txJson.getLong("date");
-							
-							String parentBeacon = "";
-							long nonce = 0;
-							
-							ECDSA signer = new ECDSA();
-							
-							//check if signature is good
-							if(!txJson.has("parentBeacon")) {
-								 sig = ECDSASignature.fromByteArray(Converter.hexToBytes(txJson.getString("sig")));
-								 pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
-								
-								Sha256Hash TxHash = Sha256.getDoubleHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
-								if(!signer.Verify(TxHash, sig, pubKey))
-									continue;
-							
-								//clean and verify inputs
-								for(int i2 = 0; i2 < inputs.length(); i2++) {
-									String inputTx = inputs.getString(i2);
-									if(!Utils.validateAddress(inputTx, VirgoAPI.TX_IDENTIFIER))
-										break;
-									
-									inputsArray.add(inputTx);
-								}
-							}else {
-								parentBeacon = txJson.getString("parentBeacon");
-								nonce = txJson.getLong("nonce");
-							}
-
-							//clean and verify parents
-							ArrayList<String> parentsArray = new ArrayList<String>();
-							for(int i2 = 0; i2 < parents.length(); i2++) {
-								String parentTx = parents.getString(i2);
-								if(!Utils.validateAddress(parentTx, VirgoAPI.TX_IDENTIFIER))
-									break;
-								
-								parentsArray.add(parentTx);
-							}							
-
-							//clean and verify ouputs
-							HashMap<String, TxOutput> outputsArray = new HashMap<String, TxOutput>();
-							for(int i2 = 0; i2 < outputs.length(); i2++) {
-								String outputString = outputs.getString(i2);
-								try {
-									TxOutput output = TxOutput.fromString(outputString);
-									outputsArray.put(output.getAddress(), output);
-								}catch(IllegalArgumentException e) {
-									break;
-								}
-							}
-							
-							//If everything has been successfully verified add transaction, else goto next iteration
-							if(inputsArray.size() == inputs.length() && parentsArray.size() == parents.length()
-									&& outputsArray.size() == outputs.length()) {
-								
-								Transaction tx = new Transaction(receivedTxUid, sig, pubKey,
-										parentsArray.toArray(new String[0]), inputsArray.toArray(new String[0]), outputsArray, parentBeacon, nonce, date);
-																
+							Transaction tx = Transaction.fromJSONObject(txJson);
+							if(tx != null)
 								foundTransactions.put(receivedTxUid, tx);
-								
-							}
 							
 						}
 					}catch(JSONException e) {}
@@ -266,14 +203,13 @@ public class VirgoAPI {
 	}
 	
 	
-	//TODO: Send the request to all peers and concatenate data to get more complete responses
 	/**
 	 * Get all transactions relative to given addresses
 	 * 
 	 * @param addresses An array of the addresses to fetch
 	 * @return {@link GetAddressesTxsResponse} Containing the transactions IDs corresponding to each addresses
 	 */
-	public GetAddressesTxsResponse getAddressesTxs(String[] addresses) {
+	public GetAddressesTxsResponse getAddressesTransactions(String[] addresses, int perPage, int page, String type) {
 		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
 		
 		//Check if every given address is valid, if not throw an illegalArgumentException
@@ -293,41 +229,32 @@ public class VirgoAPI {
 				if(addressesTxsMap.containsKey(address))
 					continue;
 				
-				Response resp = provider.get("/address/"+address+"/txs/100");
+				Response resp = provider.get("/address/"+address+"/"+type+"/"+perPage+"/"+page);
 				
 				if(resp.getResponseCode() == ResponseCode.OK) {
 					
 					try {
 						JSONObject respJSON = new JSONObject(resp.getResponse());
 						
-						JSONArray inputsJSON = respJSON.getJSONArray("inputs");
-						JSONArray outputsJSON = respJSON.getJSONArray("outputs");
+						JSONArray transactionsJSON = respJSON.getJSONArray(type);
 						
-						//verify inputs
-						ArrayList<String> inputs = new ArrayList<String>();
-						for(int i = 0; i < inputsJSON.length(); i++) {
-							String tx = inputsJSON.getString(i);
+						ArrayList<String> transactions = new ArrayList<String>();
+						for(int i = 0; i < transactionsJSON.length(); i++) {
+							String tx = transactionsJSON.getString(i);
 							if(!Utils.validateAddress(tx, VirgoAPI.TX_IDENTIFIER))
 								break;
 							
-							inputs.add(tx);
+							transactions.add(tx);
 						}
 						
-						//verify outputs
-						ArrayList<String> outputs = new ArrayList<String>();
-						for(int i = 0; i < outputsJSON.length(); i++) {
-							String tx = outputsJSON.getString(i);
-							if(!Utils.validateAddress(tx, VirgoAPI.TX_IDENTIFIER))
-								break;
-							
-							outputs.add(tx);
-						}
 						
-						if(inputs.size() == inputsJSON.length() && outputs.size() == outputsJSON.length())
-							addressesTxsMap.put(address, new AddressTxs(address, inputs, outputs));
+						if(transactions.size() == transactionsJSON.length())
+							addressesTxsMap.put(address, new AddressTxs(address, transactions, respJSON.getInt("size")));
 						else break;
 							
-					}catch(JSONException e) {}
+					}catch(JSONException e) {
+						e.printStackTrace();
+					}
 					
 				}
 				
@@ -342,61 +269,28 @@ public class VirgoAPI {
 		return new GetAddressesTxsResponse(ResponseCode.NOT_FOUND, null);
 	}
 	
-	public GetUnspentInputsResponse getAddressesUnspentInputs(String[] addresses) {
-		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
-		
-		//Check if every given address is valid, if not throw an illegalArgumentException
-		for(String address : addresses) {
-			if(!Utils.validateAddress(address, ADDR_IDENTIFIER))
-				throw new IllegalArgumentException(address + " is not a valid address");
-		}
-		
-		//valid transactions container
-		HashMap<String, ArrayList<String>> addressesTxsMap = new HashMap<String, ArrayList<String>>();
-		
-		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
-		while(providers.hasNext()) {
-			Provider provider = providers.next();
-			
-			for(String address : addresses) {
-				if(addressesTxsMap.containsKey(address))
-					continue;
-				
-				Response resp = provider.get("/address/"+address+"/unspent");
-				
-				if(resp.getResponseCode() == ResponseCode.OK) {
-					
-					try {
-						
-						JSONArray inputsJSON = new JSONArray(resp.getResponse());
-						
-						//verify inputs
-						ArrayList<String> inputs = new ArrayList<String>();
-						for(int i = 0; i < inputsJSON.length(); i++) {
-							String tx = inputsJSON.getString(i);
-							if(!Utils.validateAddress(tx, VirgoAPI.TX_IDENTIFIER))
-								break;
-							
-							inputs.add(tx);
-						}
-						
-						if(inputs.size() == inputsJSON.length())
-							addressesTxsMap.put(address, inputs);
-						else break;
-							
-					}catch(JSONException e) {}
-					
-				}
-				
-			}
-			
-		}
-		
-		if(addressesTxsMap.size() != 0)
-			return new GetUnspentInputsResponse(ResponseCode.OK, addressesTxsMap);
-		
-		//If nothing has been returned yet return 404 NOT FOUND error
-		return new GetUnspentInputsResponse(ResponseCode.NOT_FOUND, null);
+	public GetAddressesTxsResponse getAddressesOutputs(String[] addresses, int perPage, int page) {
+		return getAddressesTransactions(addresses, perPage, page, "outputs");
+	}
+	
+	public GetAddressesTxsResponse getAddressesOutputs(String[] addresses) {
+		return getAddressesTransactions(addresses, 100, 1, "outputs");
+	}
+	
+	public GetAddressesTxsResponse getAddressesInputs(String[] addresses, int perPage, int page) {
+		return getAddressesTransactions(addresses, perPage, page, "inputs");
+	}
+	
+	public GetAddressesTxsResponse getAddressesInputs(String[] addresses) {
+		return getAddressesTransactions(addresses, 100, 1, "inputs");
+	}
+	
+	public GetAddressesTxsResponse getAddressesTxs(String[] addresses, int perPage, int page) {
+		return getAddressesTransactions(addresses, perPage, page, "txs");
+	}
+	
+	public GetAddressesTxsResponse getAddressesTxs(String[] addresses) {
+		return getAddressesTransactions(addresses, 100, 1, "txs");
 	}
 	
 	
@@ -494,7 +388,15 @@ public class VirgoAPI {
 							JSONArray outputsState = state.getJSONArray("outputsState");
 							for(int i = 0; i < outputsState.length(); i++) {
 								JSONObject outputState = outputsState.getJSONObject(i);
-								TxOutput output = new TxOutput(outputState.getString("address"), outputState.getLong("amount"), outputState.getBoolean("spent"));
+								JSONArray claimersJSON = outputState.getJSONArray("claimers");
+								
+								HashMap<String, TxStatus> claimers = new HashMap<String, TxStatus>();
+								for(int i2 = 0; i2 < claimersJSON.length(); i2++) {
+									JSONObject claimer = claimersJSON.getJSONObject(i2);
+									claimers.put(claimer.getString("id"), TxStatus.fromCode(claimer.getInt("status")));
+								}
+								
+								TxOutput output = new TxOutput(outputState.getString("address"), outputState.getLong("amount"), outputState.getBoolean("spent"), claimers);
 								outputsStateMap.put(output.getAddress(), output);
 							}
 							
@@ -508,7 +410,7 @@ public class VirgoAPI {
 									break;
 							}
 							
-							states.put(transaction, new TransactionState(transaction, TxStatus.fromCode(state.getInt("status")), beacon, confirmations, outputsStateMap, true));
+							states.put(transaction, new TransactionState(transaction, TxStatus.fromCode(state.getInt("status")), beacon, confirmations, outputsStateMap));
 						}else break;
 						
 					}catch(JSONException e) {}
@@ -545,7 +447,7 @@ public class VirgoAPI {
 					GetPoWInformationsResponse informations = new GetPoWInformationsResponse(ResponseCode.OK,
 							respJSON.getString("parentBeacon"),
 							respJSON.getString("key"),
-							respJSON.getLong("difficulty"),
+							new BigInteger(respJSON.getString("difficulty")),
 							parents
 							);
 					
@@ -555,8 +457,17 @@ public class VirgoAPI {
 			}
 		}
 		
-		return new GetPoWInformationsResponse(ResponseCode.NOT_FOUND, "", "", 0, null);
+		return new GetPoWInformationsResponse(ResponseCode.NOT_FOUND, "", "", BigInteger.ONE, null);
 		
+	}
+	
+	public void broadcastTransaction(JSONObject transaction) {
+		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
+		
+		while(providers.hasNext()) {
+			Provider provider = providers.next();
+			provider.post("/tx", transaction.toString());
+		}
 	}
 	
 	public static VirgoAPI getInstance() {

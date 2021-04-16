@@ -1,5 +1,6 @@
 package io.virgo.virgoAPI.requestsResponses;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 
 import io.virgo.virgoAPI.network.ResponseCode;
@@ -8,10 +9,10 @@ public class GetPoWInformationsResponse extends RequestResponse {
 
 	private String parentBeacon;
 	private String key;
-	private long difficulty;
+	private BigInteger difficulty;
 	private ArrayList<String> parents;
 	
-	public GetPoWInformationsResponse(ResponseCode code, String parentBeacon, String key, long difficulty, ArrayList<String> parents) {
+	public GetPoWInformationsResponse(ResponseCode code, String parentBeacon, String key, BigInteger difficulty, ArrayList<String> parents) {
 		super(RequestType.GET_POW_INFORMATIONS, code);
 		
 		this.parentBeacon = parentBeacon;
@@ -29,7 +30,7 @@ public class GetPoWInformationsResponse extends RequestResponse {
 		return key;
 	}
 	
-	public long getDifficulty() {
+	public BigInteger getDifficulty() {
 		return difficulty;
 	}
 	

@@ -1,5 +1,6 @@
 package io.virgo.virgoAPI.network;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -17,7 +18,7 @@ import org.json.JSONObject;
  */
 public class ProvidersWatcher {
 
-	private volatile ArrayList<String> providersIds = new ArrayList<String>();
+	private volatile HashMap<String, Provider> providersByHostname = new HashMap<String, Provider>();
 	
 	private volatile HashMap<Provider, Long> readyProviders = new HashMap<Provider, Long>();
 	private volatile ArrayList<Provider> pendingProviders = new ArrayList<Provider>();
@@ -135,17 +136,49 @@ public class ProvidersWatcher {
 		}
 	}
 	
-	public void addProvider(Provider provider) {
-		if(providersIds.contains(provider.hostname))
-			return;
+	public boolean addProvider(Provider provider) {
+		if(providersByHostname.containsKey(provider.hostname))
+			return false;
 		
 		pendingProviders.add(0, provider);
-		providersIds.add(provider.hostname);
+		providersByHostname.put(provider.hostname, provider);
+		return true;
 	}
 
+	public void removeProvider(URL hostname) {
+		String formatedHostname = hostname.getProtocol() + "://" + hostname.getHost();
+		
+		if(hostname.getPort() == -1)
+			formatedHostname += ":"+hostname.getDefaultPort();
+		else
+			formatedHostname += ":"+hostname.getPort();
+		
+		removeProvider(formatedHostname);
+	}
+	
+	public void removeProvider(Provider provider) {
+		removeProvider(provider.hostname);
+	}
+	
+	public void removeProvider(String hostname) {
+		Provider provider = providersByHostname.get(hostname);
+		
+		if(provider == null)
+			return;
+		providersByHostname.remove(hostname);
+		
+		readyProviders.remove(provider);
+		pendingProviders.remove(provider);
+		providersToCheck.remove(provider);
+	}
+	
 	public void shutdown() {
 		checkerTimer.cancel();
 		pendingProvidersChecker.interrupt();
+	}
+	
+	public ArrayList<String> getProvidersIDs(){
+		return new ArrayList<String>(providersByHostname.keySet());
 	}
 	
 }

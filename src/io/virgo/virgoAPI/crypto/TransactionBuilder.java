@@ -2,22 +2,20 @@ package io.virgo.virgoAPI.crypto;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.virgoAPI.VirgoAPI;
-import io.virgo.virgoAPI.data.AddressTxs;
 import io.virgo.virgoAPI.data.TransactionState;
+import io.virgo.virgoAPI.data.TxStatus;
 import io.virgo.virgoAPI.network.Provider;
 import io.virgo.virgoAPI.network.Response;
 import io.virgo.virgoAPI.network.ResponseCode;
 import io.virgo.virgoAPI.requestsResponses.GetAddressesTxsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
-import io.virgo.virgoAPI.utils.Miscellaneous;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoCryptoLib.Sha256;
@@ -142,22 +140,67 @@ public class TransactionBuilder {
 		if(!address.checkAgainstPrivateKey(privateKey))
 			throw new IllegalArgumentException("Given private key doesn't correspond to given address");
 		
-		if(inputs.size() == 0) {
-			//Get address transactions from peers
-			String[] addr = {address.getAddress()};
-			GetAddressesTxsResponse addrTxsResp = VirgoAPI.getInstance().getAddressesTxs(addr);
-			
-			if(addrTxsResp.getResponseCode() != ResponseCode.OK)
-				throw new IOException("Unable to get address transactions from remote");
-			
-			AddressTxs addrTxs = addrTxsResp.getAddressTxs(address.getAddress());
-			inputs.addAll(Arrays.asList(addrTxs.getInputs()));
-		}
-		
-		if(inputs.size() == 0)
-			throw new IllegalStateException("No input transaction found");
+		//Calculate how much we try to spend
+		long outputsValue = 0;
+		for(TxOutput output : outputs.values())
+			outputsValue += output.getAmount();
+				
+		//From states, calculate how much is spendable
+		long inputsValue = 0;
 		
 		ArrayList<String> unspentInputs = new ArrayList<String>();
+		
+		if(inputs.size() == 0) {
+			
+			int page = 1;
+			
+			while(inputsValue < outputsValue) {
+				//Get address transactions from peers
+				String[] addr = {address.getAddress()};
+				GetAddressesTxsResponse addrTxsResp = VirgoAPI.getInstance().getAddressesInputs(addr, 10, page);
+				
+				if(addrTxsResp.getResponseCode() != ResponseCode.OK)
+					throw new IOException("Unable to get address transactions from remote");
+				
+				GetTxsStateResponse txsStateResp = VirgoAPI.getInstance().getTxsState(addrTxsResp.getAddressTxs(address.getAddress()).getTransactions());
+				
+				if(txsStateResp.getResponseCode() != ResponseCode.OK)
+					throw new IOException("Unable to get transactions states from remote");
+				
+				statesFor:
+				for(TransactionState state : txsStateResp.getStates()) {
+					
+					if(state.getStatus().isRefused() || state.isOutputSpent(address.getAddress()))
+						continue;
+					
+					for(TxStatus status : state.getOutput(address.getAddress()).getClaimers().values())
+						if(status.isPending())
+							continue statesFor;
+					
+					inputsValue += state.getOutput(address.getAddress()).getAmount();
+					
+					if(!unspentInputs.contains(state.getUid()))
+						unspentInputs.add(state.getUid());
+					
+					if(inputsValue >= outputsValue)
+						break;
+				}
+				
+				page++;
+				
+				if(addrTxsResp.getAddressTxs(address.getAddress()).getTransactions().length < 10)
+					break;
+
+			}
+			
+			if(inputsValue < outputsValue)
+				throw new IllegalArgumentException("Trying to spend more than allowed ("+outputsValue+" / " + inputsValue +")");
+
+			if(outputsValue < inputsValue)
+				outputs.put(address.getAddress(), new TxOutput(address.getAddress(),inputsValue-outputsValue));
+			
+			validateAmounts = false;
+		}
 		
 		//amounts verification process, make sure we don't try to spend more than allowed and that we are not paying more fees than needed
 		if(validateAmounts) {
@@ -167,38 +210,39 @@ public class TransactionBuilder {
 			if(txsStateResp.getResponseCode() != ResponseCode.OK)
 				throw new IOException("Unable to get transactions states from remote");
 			
-			//From states, calculate how much is spendable
-			long inputsValue = 0;
-			
 			ArrayList<TransactionState> inputsState = txsStateResp.getStates();
+			statesFor:
 			for(TransactionState state : inputsState) {
 				try {
-					if(state.hasBeenFound() && !state.isOutputSpent(address.getAddress())) {
-						long amount = state.getOutput(address.getAddress()).getAmount();
+					if(!state.getStatus().isRefused() && !state.isOutputSpent(address.getAddress())) {
+						
+						TxOutput output = state.getOutput(address.getAddress());
+						
+						//if there is pending claimers then ignore this input
+						for(TxStatus status : output.getClaimers().values())
+							if(status.isPending())
+								continue statesFor;
+						
 						unspentInputs.add(state.getUid());
-						inputsValue += amount;
+						inputsValue += output.getAmount();
 					}				
 				}catch(IllegalArgumentException e) {
 					System.out.println(e.getMessage());
 				}
 					
 			}
-			
-			//Calculate how much we try to spend
-			long outputsValue = 0;
-			for(TxOutput output : outputs.values())
-				outputsValue += output.getAmount();
 					
 			//If we are trying to spend more than allowed throw an error
 			if(outputsValue > inputsValue)
-				throw new IllegalArgumentException("Trying to spend more than allowed ("+outputsValue+" / " + inputsValue +")");
+					throw new IllegalArgumentException("Trying to spend more than allowed ("+outputsValue+" / " + inputsValue +")");
 			
 			//If we are spending less than allowed create an output to get back whats remain
 			else if(outputsValue < inputsValue)
 				outputs.put(address.getAddress(), new TxOutput(address.getAddress(),inputsValue-outputsValue));
-		}else
-			unspentInputs.addAll(inputs);
+		}else unspentInputs.addAll(inputs);
 		
+		if(unspentInputs.size() == 0)
+			throw new IllegalStateException("No input transaction found");
 		
 		if(parents.size() == 0) {
 			//Get the tips we will attach the transaction to from peers

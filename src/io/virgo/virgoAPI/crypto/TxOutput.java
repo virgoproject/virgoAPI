@@ -1,8 +1,13 @@
 package io.virgo.virgoAPI.crypto;
 
 import java.math.BigInteger;
+import java.util.HashMap;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import io.virgo.virgoAPI.VirgoAPI;
+import io.virgo.virgoAPI.data.TxStatus;
 import io.virgo.virgoAPI.utils.Miscellaneous;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.Utils;
@@ -15,6 +20,7 @@ public class TxOutput {
 	private String address;
 	private long amount;
 	private boolean isSpent;
+	private HashMap<String, TxStatus> claimers = new HashMap<String, TxStatus>();
 	
 	/**
 	 * Create a new transaction output
@@ -47,6 +53,19 @@ public class TxOutput {
 	}
 	
 	/**
+	 * Create a new transaction output
+	 * 
+	 * @param address The recipient address (wich will receive the coins)
+	 * @param amount The amount to send
+	 * @param claimers  HashMap of claiming transactions and their status
+	 */
+	public TxOutput(String address, long amount, boolean isSpent, HashMap<String, TxStatus> claimers) {
+		this(address,amount,isSpent);
+		
+		this.claimers.putAll(claimers);
+	}
+	
+	/**
 	 * Create a TxOutput from a string
 	 * 
 	 * @param inputString the string to convert to TxOutput, format: "address,amount" or "address,amount,claimedBy"
@@ -64,9 +83,6 @@ public class TxOutput {
 			if(Utils.validateAddress(outArgs[0], VirgoAPI.ADDR_IDENTIFIER))
 				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact());
 			break;
-		case 3:
-			if(Utils.validateAddress(outArgs[0], VirgoAPI.ADDR_IDENTIFIER) && Utils.validateAddress(outArgs[2], VirgoAPI.TX_IDENTIFIER))
-				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact());
 		}
 		
 		throw new IllegalArgumentException("Can't build a TxOutput from this string.");
@@ -93,11 +109,49 @@ public class TxOutput {
 		return address + "," + Converter.decToHex(BigInteger.valueOf(amount));
 	}
 	
+	public JSONObject toJSONObject() {
+		JSONObject JSONRepresentation = new JSONObject();
+
+		JSONRepresentation.put("address", address);
+		JSONRepresentation.put("amount", amount);
+		JSONRepresentation.put("isSpent", isSpent);
+		
+		JSONArray claimersJSON = new JSONArray();
+		
+		for(String claimer : claimers.keySet()) {
+			JSONObject claimerJSON = new JSONObject();
+			claimerJSON.put("uid", claimer);
+			claimerJSON.put("status", claimers.get(claimer).getCode());
+		}
+		
+		JSONRepresentation.put("claimers", claimersJSON);
+		
+		return JSONRepresentation;
+	}
+	
+	public static TxOutput fromJSONObject(JSONObject JSONRepresentation) {
+		
+		JSONArray claimersJSON = JSONRepresentation.getJSONArray("claimers");
+		
+		HashMap<String, TxStatus> claimers = new HashMap<String, TxStatus>();
+		for(int i = 0; i < claimersJSON.length(); i++) {
+			JSONObject claimerJSON = claimersJSON.getJSONObject(i);
+			claimers.put(claimerJSON.getString("uid"), TxStatus.fromCode(claimerJSON.getInt("status")));
+		}
+		
+		return new TxOutput(JSONRepresentation.getString("address"), JSONRepresentation.getLong("amount"), JSONRepresentation.getBoolean("isSpent"), claimers);
+		
+	}
+	
 	/**
 	 * @return Has the output been spent by a transaction
 	 */
 	public boolean isSpent() {
 		return isSpent;
+	}
+	
+	public HashMap<String, TxStatus> getClaimers(){
+		return new HashMap<String, TxStatus>(claimers);
 	}
 	
 }
