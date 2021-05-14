@@ -8,7 +8,6 @@ import org.json.JSONObject;
 
 import io.virgo.virgoAPI.VirgoAPI;
 import io.virgo.virgoAPI.data.TxStatus;
-import io.virgo.virgoAPI.utils.Miscellaneous;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.Utils;
 
@@ -32,7 +31,7 @@ public class TxOutput {
 		if(!Utils.validateAddress(address, VirgoAPI.ADDR_IDENTIFIER))
 			throw new IllegalArgumentException(address + " is not a valid address");
 		
-		if(!Miscellaneous.validateAmount(amount))
+		if(amount <= 0)
 			throw new IllegalArgumentException(amount + " is not a valid amount");
 	
 		this.address = address;

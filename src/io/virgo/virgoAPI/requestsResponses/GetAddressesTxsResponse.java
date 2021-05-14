@@ -1,6 +1,5 @@
 package io.virgo.virgoAPI.requestsResponses;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import io.virgo.virgoAPI.data.AddressTxs;

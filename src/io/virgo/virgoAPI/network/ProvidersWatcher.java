@@ -31,6 +31,10 @@ public class ProvidersWatcher {
 	
 	public ProvidersWatcher(long checkRate) {
 		
+		/**
+		 * Update providers scores every x seconds
+		 * TODO: Make this parametrable
+		 */
 		checkerTimer = new Timer();
 		checkerTimer.scheduleAtFixedRate(new TimerTask() {
 
@@ -46,6 +50,7 @@ public class ProvidersWatcher {
 			
 		}, 0, 10000);
 		
+		//Start a thread that will check pending providers to add them to active providers list
 		pendingProvidersChecker = new Thread(new Runnable() {
 
 			@Override
@@ -96,6 +101,10 @@ public class ProvidersWatcher {
 		return sortedProviders;
 	}
 	
+	/**
+	 * Check a given provider validity by connecting to it and asking it's node informations
+	 * @param provider the provider to check
+	 */
 	private void checkPendingProvider(Provider provider) {
 		
 		Response resp = provider.get("/nodeinfos");
@@ -111,6 +120,10 @@ public class ProvidersWatcher {
 		}
 	}
 	
+	/**
+	 * Update ready providers scores by getting their node informations.
+	 * Score corresponds to the weight of their DAG
+	 */
 	public void updateScores() {
 		for(Provider provider : readyProviders.keySet()) {
 			
@@ -136,6 +149,11 @@ public class ProvidersWatcher {
 		}
 	}
 	
+	/**
+	 * Added a provider to watcher's list, it will then try to connect to it
+	 * @param provider The provider object you want to add
+	 * @return true if added, false if already in list
+	 */
 	public boolean addProvider(Provider provider) {
 		if(providersByHostname.containsKey(provider.hostname))
 			return false;
@@ -145,6 +163,10 @@ public class ProvidersWatcher {
 		return true;
 	}
 
+	/**
+	 * Remove the provider corresponding to the given hostname
+	 * @param hostname The URL hostname of the provider to remove
+	 */
 	public void removeProvider(URL hostname) {
 		String formatedHostname = hostname.getProtocol() + "://" + hostname.getHost();
 		
@@ -156,10 +178,18 @@ public class ProvidersWatcher {
 		removeProvider(formatedHostname);
 	}
 	
+	/**
+	 * Remove the given provider
+	 * @param provider the provider to remove
+	 */
 	public void removeProvider(Provider provider) {
 		removeProvider(provider.hostname);
 	}
 	
+	/**
+	 * Remove the provider corresponding to the given hostname
+	 * @param hostname The hostname of the provider to remove
+	 */
 	public void removeProvider(String hostname) {
 		Provider provider = providersByHostname.get(hostname);
 		
@@ -177,7 +207,7 @@ public class ProvidersWatcher {
 		pendingProvidersChecker.interrupt();
 	}
 	
-	public ArrayList<String> getProvidersIDs(){
+	public ArrayList<String> getProvidersHostnames(){
 		return new ArrayList<String>(providersByHostname.keySet());
 	}
 	

@@ -17,6 +17,11 @@ public class Provider {
 		this.hostname = hostname;
 	}
 	
+	/**
+	 * Call a REST GET method and return it's result
+	 * @param method The method to call
+	 * @return the result
+	 */
 	public Response get(String method) {
 		try {
 			URL url = new URL(hostname + method);
@@ -50,6 +55,12 @@ public class Provider {
 		return new Response(ResponseCode.BAD_REQUEST, null);
 	}
 	
+	/**
+	 * Call a REST POST method and return it's result
+	 * @param method The method to call
+	 * @param data The data to post
+	 * @return the result
+	 */
 	public Response post(String method, String data) {
 		try {
 			URL url = new URL(hostname+method);

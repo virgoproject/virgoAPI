@@ -30,10 +30,7 @@ import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTransactionsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
 import io.virgo.virgoCryptoLib.Converter;
-import io.virgo.virgoCryptoLib.ECDSA;
-import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoCryptoLib.Sha256;
-import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoCryptoLib.Utils;
 
 /**
@@ -59,6 +56,11 @@ public class VirgoAPI {
 			addProvider(providerHostname);
 	}
 	
+	/**
+	 * Add a REST API provider and try to connect to it
+	 * @param hostname
+	 * @return true if added, false otherwise
+	 */
 	public boolean addProvider(URL hostname) {
 		String formatedHostname = hostname.getProtocol() + "://" + hostname.getHost();
 		
@@ -71,12 +73,20 @@ public class VirgoAPI {
 		return providersWatcher.addProvider(provider);
 	}
 	
+	/**
+	 * Remove a provider from list
+	 * @param hostname the hostname of the REST API provider
+	 */
 	public void removeProvider(String hostname) {
 		providersWatcher.removeProvider(hostname);
 	}
 	
-	public ArrayList<String> getProvidersIDs(){
-		return providersWatcher.getProvidersIDs();
+	/**
+	 * Get all list of all providers 
+	 * @return
+	 */
+	public ArrayList<String> getProvidersHostnames(){
+		return providersWatcher.getProvidersHostnames();
 	}
 	
 	/**
@@ -354,7 +364,7 @@ public class VirgoAPI {
 	 * @param txsUids the IDs of the transactions you want the state of
 	 * @return {@link GetTxsStateResponse} Containing the states of each transactions
 	 */
-	//TODO: Refactor this shit, states shouldn't be got from different sources? not found states must be marked as not found, not fake data
+	//TODO: Refactor, states shouldn't be got from different sources? not found states must be marked as not found, not fake data
 	public GetTxsStateResponse getTxsState(String[] txsUids) {
 		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
 		
@@ -426,6 +436,10 @@ public class VirgoAPI {
 		return new GetTxsStateResponse(ResponseCode.NOT_FOUND, null);
 	}
 	
+	/**
+	 * Get all neccessary informations for proof of work mining
+	 * @return {@link GetPoWinformations} Containing the informations (recommanded parent beacon, randomX key, difficulty and parent transactions
+	 */
 	public GetPoWInformationsResponse getPowInformations() {
 		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
 		
@@ -461,6 +475,10 @@ public class VirgoAPI {
 		
 	}
 	
+	/***
+	 * Broadcast a transaction to the network
+	 * @param transaction the transaction to broadcast in form of JSON Object
+	 */
 	public void broadcastTransaction(JSONObject transaction) {
 		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
 		
