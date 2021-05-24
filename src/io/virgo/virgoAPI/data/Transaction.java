@@ -1,5 +1,6 @@
 package io.virgo.virgoAPI.data;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,26 +15,25 @@ import io.virgo.virgoCryptoLib.ECDSA;
 import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
-import io.virgo.virgoCryptoLib.Utils;
 
 /**
  * Object representing a transaction
  */
 public class Transaction {
 
-	private String uid;
+	private Sha256Hash hash;
 	
 	private ECDSASignature signature;
 	private byte[] pubKey;
 	
-	private String[] parents;
-	private String[] inputs;
+	private Sha256Hash[] parents;
+	private Sha256Hash[] inputs;
 	
 	private HashMap<String, TxOutput> outputs;
 	
 	private long date;
 	
-	private String parentBeacon;
+	private Sha256Hash parentBeacon;
 	private long nonce;
 	
 	/**
@@ -45,8 +45,8 @@ public class Transaction {
 	 * @param outputs The transaction outputs
 	 * @param date The transaction date
 	 */
-	public Transaction(String uid, ECDSASignature signature, byte[] pubKey, String[] parents, String[] inputs, HashMap<String, TxOutput> outputs, String parentBeacon, long nonce, long date) {
-		this.uid = uid;
+	public Transaction(Sha256Hash hash, ECDSASignature signature, byte[] pubKey, Sha256Hash[] parents, Sha256Hash[] inputs, HashMap<String, TxOutput> outputs, Sha256Hash parentBeacon, long nonce, long date) {
+		this.hash = hash;
 		this.signature = signature;
 		this.pubKey = pubKey;
 		this.parents = parents;
@@ -58,8 +58,8 @@ public class Transaction {
 	/**
 	 * @return The transaction ID
 	 */
-	public String getUid() {
-		return uid;
+	public Sha256Hash getHash() {
+		return hash;
 	}
 	
 	/**
@@ -91,15 +91,31 @@ public class Transaction {
 	/**
 	 * @return The parent transactions's ids
 	 */
-	public String[] getParentsUids() {
+	public Sha256Hash[] getParentsHashes() {
 		return parents;
+	}
+	
+	public ArrayList<String> getParentsHashesStrings() {
+		ArrayList<String> hashes = new ArrayList<String>();
+		for(Sha256Hash parentHash : parents)
+			hashes.add(parentHash.toString());
+		
+		return hashes;
 	}
 	
 	/**
 	 * @return The input transactions's ids
 	 */
-	public String[] getInputsUids() {
+	public Sha256Hash[] getInputsHashes() {
 		return inputs;
+	}
+	
+	public ArrayList<String> getInputsHashesStrings() {
+		ArrayList<String> hashes = new ArrayList<String>();
+		for(Sha256Hash inputHash : inputs)
+			hashes.add(inputHash.toString());
+		
+		return hashes;
 	}
 	
 	/**
@@ -119,7 +135,7 @@ public class Transaction {
 		return outputs.get(address);
 	}
 	
-	public String getParentBeacon() {
+	public Sha256Hash getParentBeacon() {
 		return parentBeacon;
 	}
 	
@@ -141,19 +157,19 @@ public class Transaction {
 		
 		JSONObject txJson = new JSONObject();
 		
-		if(getUid().equals("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN")) {
+		if(getHash().equals(new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a"))) {
 			txJson.put("genesis", true);
 			return txJson;
 		}
 		
-		txJson.put("parents", new JSONArray(getParentsUids()));
+		txJson.put("parents", new JSONArray(getParentsHashesStrings()));
 		
 		if(parentBeacon == null) {
 			txJson.put("sig", getSignature().toHexString());
 			txJson.put("pubKey", Converter.bytesToHex(getPublicKey()));
-			txJson.put("inputs", new JSONArray(getInputsUids()));
+			txJson.put("inputs", new JSONArray(getInputsHashesStrings()));
 		} else {
-			txJson.put("parentBeacon", parentBeacon);
+			txJson.put("parentBeacon", parentBeacon.toString());
 			txJson.put("nonce", getNonce());
 		}
 		
@@ -172,27 +188,30 @@ public class Transaction {
 		if(JSONRepresentation.has("genesis")) {
 			HashMap<String, TxOutput> genesisOutputs = new HashMap<String, TxOutput>();
 			genesisOutputs.put("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv",(long) (100000 * Math.pow(10, VirgoAPI.DECIMALS))));
-			return new Transaction("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN",null,null,new String[0],new String[0], genesisOutputs, "", 0, 0);
+			return new Transaction(new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a"),null,null,new Sha256Hash[0],new Sha256Hash[0], genesisOutputs, null, 0, 0);
 		}
 		
-		String uid = "";
+		Sha256Hash txHash;
 		
 		if(JSONRepresentation.has("parentBeacon"))
-			uid = Converter.Addressify(Sha256.getDoubleHash((JSONRepresentation.getJSONArray("parents").toString()
+			txHash = Sha256.getDoubleHash((JSONRepresentation.getJSONArray("parents").toString()
 					+ JSONRepresentation.getJSONArray("outputs").toString()
 					+ JSONRepresentation.getString("parentBeacon")
 					+ JSONRepresentation.getLong("date")
-					+ JSONRepresentation.getLong("nonce")).getBytes()).toBytes(), VirgoAPI.TX_IDENTIFIER);
+					+ JSONRepresentation.getLong("nonce")).getBytes());
 		else
-			uid = Converter.Addressify(Converter.hexToBytes(JSONRepresentation.getString("sig")), VirgoAPI.TX_IDENTIFIER);
+			txHash = Sha256.getDoubleHash(Converter.concatByteArrays(
+					(JSONRepresentation.getJSONArray("parents").toString() + JSONRepresentation.getJSONArray("inputs").toString() + JSONRepresentation.getJSONArray("outputs").toString()).getBytes(),
+					Converter.hexToBytes(JSONRepresentation.getString("sig")), Converter.hexToBytes(JSONRepresentation.getString("pubKey")), longToBytes(JSONRepresentation.getLong("date"))));
 		
 		ECDSASignature sig = null;
 		byte[] pubKey = null;
 		
 		JSONArray parents = JSONRepresentation.getJSONArray("parents");
 		
-		ArrayList<String> inputsArray = new ArrayList<String>();
+		ArrayList<Sha256Hash> inputsArray = new ArrayList<Sha256Hash>();
 		JSONArray inputs = new JSONArray();
+		
 		if(!JSONRepresentation.has("parentBeacon"))
 			inputs = JSONRepresentation.getJSONArray("inputs");
 		
@@ -200,7 +219,7 @@ public class Transaction {
 		
 		long date = JSONRepresentation.getLong("date");
 		
-		String parentBeacon = null;
+		Sha256Hash parentBeacon = null;
 		long nonce = 0;
 		
 		ECDSA signer = new ECDSA();
@@ -210,31 +229,30 @@ public class Transaction {
 			 sig = ECDSASignature.fromByteArray(Converter.hexToBytes(JSONRepresentation.getString("sig")));
 			 pubKey = Converter.hexToBytes(JSONRepresentation.getString("pubKey"));
 			
-			Sha256Hash TxHash = Sha256.getDoubleHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
-			if(!signer.Verify(TxHash, sig, pubKey))
+			 if(!signer.Verify(txHash, sig, pubKey))
 				return null;
 		
 			//clean and verify inputs
 			for(int i2 = 0; i2 < inputs.length(); i2++) {
-				String inputTx = inputs.getString(i2);
-				if(!Utils.validateAddress(inputTx, VirgoAPI.TX_IDENTIFIER))
+				try {
+					inputsArray.add(new Sha256Hash(inputs.getString(i2)));
+				}catch(IllegalArgumentException e) {
 					break;
-				
-				inputsArray.add(inputTx);
+				}
 			}
 		}else {
-			parentBeacon = JSONRepresentation.getString("parentBeacon");
+			parentBeacon = new Sha256Hash(JSONRepresentation.getString("parentBeacon"));
 			nonce = JSONRepresentation.getLong("nonce");
 		}
 
 		//clean and verify parents
-		ArrayList<String> parentsArray = new ArrayList<String>();
+		ArrayList<Sha256Hash> parentsArray = new ArrayList<Sha256Hash>();
 		for(int i2 = 0; i2 < parents.length(); i2++) {
-			String parentTx = parents.getString(i2);
-			if(!Utils.validateAddress(parentTx, VirgoAPI.TX_IDENTIFIER))
+			try {
+				parentsArray.add(new Sha256Hash(parents.getString(i2)));
+			}catch(IllegalArgumentException e) {
 				break;
-			
-			parentsArray.add(parentTx);
+			}
 		}							
 
 		//clean and verify ouputs
@@ -253,12 +271,18 @@ public class Transaction {
 		if(inputsArray.size() == inputs.length() && parentsArray.size() == parents.length()
 				&& outputsArray.size() == outputs.length()) {
 			
-			return new Transaction(uid, sig, pubKey,
-					parentsArray.toArray(new String[0]), inputsArray.toArray(new String[0]), outputsArray, parentBeacon, nonce, date);
+			return new Transaction(txHash, sig, pubKey,
+					parentsArray.toArray(new Sha256Hash[0]), inputsArray.toArray(new Sha256Hash[0]), outputsArray, parentBeacon, nonce, date);
 			
 		}else {
 			return null;
 		}
+	}
+	
+	public static byte[] longToBytes(long x) {
+	    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+	    buffer.putLong(x);
+	    return buffer.array();
 	}
 	
 }

@@ -6,16 +6,17 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.virgoAPI.crypto.TxOutput;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 
 /**
  * Object representing a transaction's state
  */
 public class TransactionState {
 
-	private String uid;
+	private Sha256Hash hash;
 	private TxStatus status;
 	private int confirmations;
-	private String beacon;
+	private Sha256Hash beacon;
 	private HashMap<String, TxOutput> outputs;
 	
 	/**
@@ -26,8 +27,8 @@ public class TransactionState {
 	 * @param outputs Target transaction's outputs
 	 * @param found Has the transaction been found
 	 */
-	public TransactionState(String uid, TxStatus status, String beacon, int confirmations, HashMap<String, TxOutput> outputs) {
-		this.uid = uid;
+	public TransactionState(Sha256Hash hash, TxStatus status, Sha256Hash beacon, int confirmations, HashMap<String, TxOutput> outputs) {
+		this.hash = hash;
 		this.status = status;
 		this.beacon = beacon;
 		this.confirmations = confirmations;
@@ -37,8 +38,8 @@ public class TransactionState {
 	/**
 	 * @return The Id of the transaction this object is about
 	 */
-	public String getUid() {
-		return uid;
+	public Sha256Hash getHash() {
+		return hash;
 	}
 	
 	/**
@@ -61,7 +62,7 @@ public class TransactionState {
 	 * @return ID of the beacon that is confirming this transaction
 	 * Note: This doesn't update, if you want newer data request it again using the API
 	 */
-	public String getBeacon() {
+	public Sha256Hash getBeaconHash() {
 		return beacon;
 	}
 	
@@ -101,15 +102,15 @@ public class TransactionState {
 		if(hasOutput(address))
 			return outputs.get(address).isSpent();
 		
-		throw new IllegalArgumentException("Output address " + address + " not found for transaction " + uid);
+		throw new IllegalArgumentException("Output address " + address + " not found for transaction " + hash.toString());
 	}
 	
 	public JSONObject toJSONObject() {
 		JSONObject JSONRepresentation = new JSONObject();
 		
-		JSONRepresentation.put("uid", uid);
+		JSONRepresentation.put("uid", hash.toString());
 		JSONRepresentation.put("status", status.getCode());
-		JSONRepresentation.put("parentBeacon", beacon);
+		JSONRepresentation.put("parentBeacon", beacon.toString());
 		JSONRepresentation.put("confirmations", confirmations);
 
 		JSONArray outputsJSON = new JSONArray();
@@ -132,7 +133,7 @@ public class TransactionState {
 			outputs.put(output.getAddress(), output);
 		}
 		
-		return new TransactionState(JSONRepresentation.getString("uid"), TxStatus.fromCode(JSONRepresentation.getInt("status")), JSONRepresentation.getString("parentBeacon"), JSONRepresentation.getInt("confirmations"), outputs);
+		return new TransactionState(new Sha256Hash(JSONRepresentation.getString("uid")), TxStatus.fromCode(JSONRepresentation.getInt("status")), new Sha256Hash(JSONRepresentation.getString("parentBeacon")), JSONRepresentation.getInt("confirmations"), outputs);
 	}
 	
 }

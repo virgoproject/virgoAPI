@@ -9,6 +9,7 @@ import org.json.JSONObject;
 import io.virgo.virgoAPI.VirgoAPI;
 import io.virgo.virgoAPI.data.TxStatus;
 import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoCryptoLib.Utils;
 
 /**
@@ -19,7 +20,7 @@ public class TxOutput {
 	private String address;
 	private long amount;
 	private boolean isSpent;
-	private HashMap<String, TxStatus> claimers = new HashMap<String, TxStatus>();
+	private HashMap<Sha256Hash, TxStatus> claimers = new HashMap<Sha256Hash, TxStatus>();
 	
 	/**
 	 * Create a new transaction output
@@ -58,7 +59,7 @@ public class TxOutput {
 	 * @param amount The amount to send
 	 * @param claimers  HashMap of claiming transactions and their status
 	 */
-	public TxOutput(String address, long amount, boolean isSpent, HashMap<String, TxStatus> claimers) {
+	public TxOutput(String address, long amount, boolean isSpent, HashMap<Sha256Hash, TxStatus> claimers) {
 		this(address,amount,isSpent);
 		
 		this.claimers.putAll(claimers);
@@ -117,9 +118,9 @@ public class TxOutput {
 		
 		JSONArray claimersJSON = new JSONArray();
 		
-		for(String claimer : claimers.keySet()) {
+		for(Sha256Hash claimer : claimers.keySet()) {
 			JSONObject claimerJSON = new JSONObject();
-			claimerJSON.put("uid", claimer);
+			claimerJSON.put("uid", claimer.toString());
 			claimerJSON.put("status", claimers.get(claimer).getCode());
 		}
 		
@@ -132,10 +133,10 @@ public class TxOutput {
 		
 		JSONArray claimersJSON = JSONRepresentation.getJSONArray("claimers");
 		
-		HashMap<String, TxStatus> claimers = new HashMap<String, TxStatus>();
+		HashMap<Sha256Hash, TxStatus> claimers = new HashMap<Sha256Hash, TxStatus>();
 		for(int i = 0; i < claimersJSON.length(); i++) {
 			JSONObject claimerJSON = claimersJSON.getJSONObject(i);
-			claimers.put(claimerJSON.getString("uid"), TxStatus.fromCode(claimerJSON.getInt("status")));
+			claimers.put(new Sha256Hash(claimerJSON.getString("uid")), TxStatus.fromCode(claimerJSON.getInt("status")));
 		}
 		
 		return new TxOutput(JSONRepresentation.getString("address"), JSONRepresentation.getLong("amount"), JSONRepresentation.getBoolean("isSpent"), claimers);
@@ -149,8 +150,8 @@ public class TxOutput {
 		return isSpent;
 	}
 	
-	public HashMap<String, TxStatus> getClaimers(){
-		return new HashMap<String, TxStatus>(claimers);
+	public HashMap<Sha256Hash, TxStatus> getClaimers(){
+		return new HashMap<Sha256Hash, TxStatus>(claimers);
 	}
 	
 }

@@ -2,16 +2,18 @@ package io.virgo.virgoAPI.data;
 
 import java.util.ArrayList;
 
+import io.virgo.virgoCryptoLib.Sha256Hash;
+
 /**
  * An object resuming all input and output transactions of an address
  */
 public class AddressTxs {
 
 	private String address;
-	private ArrayList<String> transactions;
+	private ArrayList<Sha256Hash> transactions;
 	private int size;
 	
-	public AddressTxs(String address, ArrayList<String> transactions, int size) {
+	public AddressTxs(String address, ArrayList<Sha256Hash> transactions, int size) {
 		this.address = address;
 		this.transactions = transactions;
 		this.size = size;
@@ -27,8 +29,8 @@ public class AddressTxs {
 	/**
 	 * @return The address's transactions ids
 	 */
-	public String[] getTransactions() {
-		return transactions.toArray(new String[transactions.size()]);
+	public Sha256Hash[] getTransactions() {
+		return transactions.toArray(new Sha256Hash[transactions.size()]);
 	}
 	
 	public int getTotalSize() {

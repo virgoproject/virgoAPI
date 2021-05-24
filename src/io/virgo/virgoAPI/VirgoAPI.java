@@ -31,6 +31,7 @@ import io.virgo.virgoAPI.requestsResponses.GetTransactionsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTxsStateResponse;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.Sha256;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoCryptoLib.Utils;
 
 /**
@@ -43,7 +44,6 @@ public class VirgoAPI {
 	
 	public static final int DECIMALS = 8;
 	public static final byte[] ADDR_IDENTIFIER = new BigInteger("4039").toByteArray();
-	public static final byte[] TX_IDENTIFIER = new BigInteger("3823").toByteArray();
 	
 	/**
 	 * Create a new virgoAPI instance from builder
@@ -108,16 +108,15 @@ public class VirgoAPI {
 				
 				//if got a response check for data validity
 				try {
-					ArrayList<String> responseTips = new ArrayList<String>();
+					ArrayList<Sha256Hash> responseTips = new ArrayList<Sha256Hash>();
 					JSONArray tipsJSON = new JSONArray(resp.getResponse());
 					
 					for(int i = 0; i < tipsJSON.length(); i++) {
-						String tip = tipsJSON.getString(i);
-						
-						if(Utils.validateAddress(tip, TX_IDENTIFIER))
-							responseTips.add(tip);
-						else break;
-						
+						try {
+							responseTips.add(new Sha256Hash(tipsJSON.getString(i)));
+						}catch(IllegalArgumentException e) {
+							break;
+						}
 					}
 					
 					//if everything is good return peer response, else goto next iteration
@@ -140,10 +139,10 @@ public class VirgoAPI {
 	 * @param txId The ID of the wanted transaction
 	 * @return {@link GetTransactionResponse} containing the request result
 	 */
-	public GetTransactionsResponse getTransactions(Collection<String> txsIds) {
+	public GetTransactionsResponse getTransactions(Collection<Sha256Hash> txsHashes) {
 		
 		//remove duplicate entries from wanted transactions
-	    txsIds = new ArrayList<String>(new HashSet<String>(txsIds));
+		txsHashes = new ArrayList<Sha256Hash>(new HashSet<Sha256Hash>(txsHashes));
 		
 		//First check if given ids are valid, if not return 400 BAD_REQUEST
 		for(String txId : txsIds)

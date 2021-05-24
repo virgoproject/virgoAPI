@@ -5,14 +5,15 @@ import java.util.HashMap;
 
 import io.virgo.virgoAPI.data.TransactionState;
 import io.virgo.virgoAPI.network.ResponseCode;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 /**
  * Object representing the response to a GetTxsState request
  */
 public class GetTxsStateResponse extends RequestResponse {
 
-	private HashMap<String, TransactionState> states;
+	private HashMap<Sha256Hash, TransactionState> states;
 	
-	public GetTxsStateResponse(ResponseCode code, HashMap<String, TransactionState> states) {
+	public GetTxsStateResponse(ResponseCode code, HashMap<Sha256Hash, TransactionState> states) {
 		super(RequestType.GET_TXS_STATE, code);
 		this.states = states;
 	}
@@ -26,11 +27,11 @@ public class GetTxsStateResponse extends RequestResponse {
 	
 	/**
 	 * Get the transaction state of the given transaction
-	 * @param uid The ID of the transaction to get the state of
+	 * @param txHash The hash of the transaction to get the state of
 	 * @return The {@link TransactionState} of the given transaction or null if not found
 	 */
-	public TransactionState getState(String uid) {
-		return states.get(uid);
+	public TransactionState getState(Sha256Hash txHash) {
+		return states.get(txHash);
 	}
 	
 }

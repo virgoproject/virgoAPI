@@ -4,18 +4,19 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 
 import io.virgo.virgoAPI.network.ResponseCode;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 
 /**
  * Object representing the response to a GetPowInformations request
  */
 public class GetPoWInformationsResponse extends RequestResponse {
 
-	private String parentBeacon;
+	private Sha256Hash parentBeacon;
 	private String key;
 	private BigInteger difficulty;
-	private ArrayList<String> parents;
+	private ArrayList<Sha256Hash> parents;
 	
-	public GetPoWInformationsResponse(ResponseCode code, String parentBeacon, String key, BigInteger difficulty, ArrayList<String> parents) {
+	public GetPoWInformationsResponse(ResponseCode code, Sha256Hash parentBeacon, String key, BigInteger difficulty, ArrayList<Sha256Hash> parents) {
 		super(RequestType.GET_POW_INFORMATIONS, code);
 		
 		this.parentBeacon = parentBeacon;
@@ -28,7 +29,7 @@ public class GetPoWInformationsResponse extends RequestResponse {
 	/**
 	 * @return the recommended parent beacon's uid
 	 */
-	public String getParentBeaconUid() {
+	public Sha256Hash getParentBeaconUid() {
 		return parentBeacon;
 	}
 	
@@ -49,7 +50,7 @@ public class GetPoWInformationsResponse extends RequestResponse {
 	/**
 	 * @return The recommended parents for a beacon 
 	 */
-	public ArrayList<String> getParents(){
+	public ArrayList<Sha256Hash> getParents(){
 		return parents;
 	}
 }
