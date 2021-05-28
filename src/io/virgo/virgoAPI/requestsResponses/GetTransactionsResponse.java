@@ -1,20 +1,20 @@
 package io.virgo.virgoAPI.requestsResponses;
 
 import io.virgo.virgoAPI.data.Transaction;
+import io.virgo.virgoAPI.network.ResponseCode;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-
-import io.virgo.geoWeb.ResponseCode;
 
 /**
  * Object representing the response to a GetTransaction request
  */
 public class GetTransactionsResponse extends RequestResponse {
 
-	private HashMap<String, Transaction> transactions;
+	private HashMap<Sha256Hash, Transaction> transactions;
 	
-	public GetTransactionsResponse(ResponseCode responseCode, HashMap<String, Transaction> transactions) {
+	public GetTransactionsResponse(ResponseCode responseCode, HashMap<Sha256Hash, Transaction> transactions) {
 		super(RequestType.GET_TXS, responseCode);
 		
 		this.transactions = transactions;
@@ -28,8 +28,8 @@ public class GetTransactionsResponse extends RequestResponse {
 	 * @return The desired {@link Transaction} if found, otherwise null
 	 * @param txId the id of the desired transaction
 	 */
-	public Transaction getTransaction(String txId) {
-		return transactions.get(txId);
+	public Transaction getTransaction(Sha256Hash txHash) {
+		return transactions.get(txHash);
 	}
 	
 }

@@ -1,10 +1,9 @@
 package io.virgo.virgoAPI.requestsResponses;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import io.virgo.virgoAPI.data.AddressTxs;
-import io.virgo.geoWeb.ResponseCode;
+import io.virgo.virgoAPI.network.ResponseCode;
 
 /**
  * Object representing the response to a GetAddressesTxs request
@@ -17,13 +16,6 @@ public class GetAddressesTxsResponse extends RequestResponse {
 		super(RequestType.GET_ADDR_TXS, code);
 		
 		addressesTxs = addressesTxsMap;
-	}
-
-	/**
-	 * @return An arrayList of {@link AddressTxs} for the target addresses 
-	 */
-	public ArrayList<AddressTxs> getAddressesTxs() {
-		return new ArrayList<AddressTxs>(addressesTxs.values());
 	}
 	
 	/**
