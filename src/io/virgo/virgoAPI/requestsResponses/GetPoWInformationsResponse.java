@@ -12,11 +12,11 @@ import io.virgo.virgoCryptoLib.Sha256Hash;
 public class GetPoWInformationsResponse extends RequestResponse {
 
 	private Sha256Hash parentBeacon;
-	private String key;
+	private Sha256Hash key;
 	private BigInteger difficulty;
 	private ArrayList<Sha256Hash> parents;
 	
-	public GetPoWInformationsResponse(ResponseCode code, Sha256Hash parentBeacon, String key, BigInteger difficulty, ArrayList<Sha256Hash> parents) {
+	public GetPoWInformationsResponse(ResponseCode code, Sha256Hash parentBeacon, Sha256Hash key, BigInteger difficulty, ArrayList<Sha256Hash> parents) {
 		super(RequestType.GET_POW_INFORMATIONS, code);
 		
 		this.parentBeacon = parentBeacon;
@@ -36,7 +36,7 @@ public class GetPoWInformationsResponse extends RequestResponse {
 	/**
 	 * @return The current randomX key
 	 */
-	public String getRandomXKey() {
+	public Sha256Hash getRandomXKey() {
 		return key;
 	}
 	

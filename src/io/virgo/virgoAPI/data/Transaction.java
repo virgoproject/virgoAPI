@@ -1,6 +1,5 @@
 package io.virgo.virgoAPI.data;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,7 +33,7 @@ public class Transaction {
 	private long date;
 	
 	private Sha256Hash parentBeacon;
-	private long nonce;
+	private byte[] nonce;
 	
 	/**
 	 * @param uid The transaction ID
@@ -45,13 +44,15 @@ public class Transaction {
 	 * @param outputs The transaction outputs
 	 * @param date The transaction date
 	 */
-	public Transaction(Sha256Hash hash, ECDSASignature signature, byte[] pubKey, Sha256Hash[] parents, Sha256Hash[] inputs, HashMap<String, TxOutput> outputs, Sha256Hash parentBeacon, long nonce, long date) {
+	public Transaction(Sha256Hash hash, ECDSASignature signature, byte[] pubKey, Sha256Hash[] parents, Sha256Hash[] inputs, HashMap<String, TxOutput> outputs, Sha256Hash parentBeacon, byte[] nonce, long date) {
 		this.hash = hash;
 		this.signature = signature;
 		this.pubKey = pubKey;
 		this.parents = parents;
 		this.inputs = inputs;
 		this.outputs = outputs;
+		this.parentBeacon = parentBeacon;
+		this.nonce = nonce;
 		this.date = date;
 	}
 	
@@ -146,7 +147,7 @@ public class Transaction {
 		return date;
 	}
 	
-	public long getNonce() {
+	public byte[] getNonce() {
 		return nonce;
 	}
 	
@@ -170,7 +171,7 @@ public class Transaction {
 			txJson.put("inputs", new JSONArray(getInputsHashesStrings()));
 		} else {
 			txJson.put("parentBeacon", parentBeacon.toString());
-			txJson.put("nonce", getNonce());
+			txJson.put("nonce", Converter.bytesToHex(getNonce()));
 		}
 		
 		JSONArray outputsJson = new JSONArray();
@@ -188,21 +189,18 @@ public class Transaction {
 		if(JSONRepresentation.has("genesis")) {
 			HashMap<String, TxOutput> genesisOutputs = new HashMap<String, TxOutput>();
 			genesisOutputs.put("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv",(long) (100000 * Math.pow(10, VirgoAPI.DECIMALS))));
-			return new Transaction(new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a"),null,null,new Sha256Hash[0],new Sha256Hash[0], genesisOutputs, null, 0, 0);
+			return new Transaction(new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a"),null,null,new Sha256Hash[0],new Sha256Hash[0], genesisOutputs, null, null, 0);
 		}
 		
 		Sha256Hash txHash;
 		
 		if(JSONRepresentation.has("parentBeacon"))
-			txHash = Sha256.getDoubleHash((JSONRepresentation.getJSONArray("parents").toString()
-					+ JSONRepresentation.getJSONArray("outputs").toString()
-					+ JSONRepresentation.getString("parentBeacon")
-					+ JSONRepresentation.getLong("date")
-					+ JSONRepresentation.getLong("nonce")).getBytes());
+			txHash = Sha256.getDoubleHash(Converter.concatByteArrays((JSONRepresentation.getJSONArray("parents").toString() + JSONRepresentation.getJSONArray("outputs").toString()).getBytes(),
+					new Sha256Hash(JSONRepresentation.getString("parentBeacon")).toBytes(), Converter.longToBytes(JSONRepresentation.getLong("date")), Converter.hexToBytes(JSONRepresentation.getString("nonce"))));
 		else
 			txHash = Sha256.getDoubleHash(Converter.concatByteArrays(
 					(JSONRepresentation.getJSONArray("parents").toString() + JSONRepresentation.getJSONArray("inputs").toString() + JSONRepresentation.getJSONArray("outputs").toString()).getBytes(),
-					Converter.hexToBytes(JSONRepresentation.getString("sig")), Converter.hexToBytes(JSONRepresentation.getString("pubKey")), longToBytes(JSONRepresentation.getLong("date"))));
+					Converter.hexToBytes(JSONRepresentation.getString("pubKey")), Converter.longToBytes(JSONRepresentation.getLong("date"))));
 		
 		ECDSASignature sig = null;
 		byte[] pubKey = null;
@@ -220,7 +218,7 @@ public class Transaction {
 		long date = JSONRepresentation.getLong("date");
 		
 		Sha256Hash parentBeacon = null;
-		long nonce = 0;
+		byte[] nonce = null;
 		
 		ECDSA signer = new ECDSA();
 		
@@ -242,7 +240,7 @@ public class Transaction {
 			}
 		}else {
 			parentBeacon = new Sha256Hash(JSONRepresentation.getString("parentBeacon"));
-			nonce = JSONRepresentation.getLong("nonce");
+			nonce = Converter.hexToBytes(JSONRepresentation.getString("nonce"));
 		}
 
 		//clean and verify parents
@@ -277,12 +275,6 @@ public class Transaction {
 		}else {
 			return null;
 		}
-	}
-	
-	public static byte[] longToBytes(long x) {
-	    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
-	    buffer.putLong(x);
-	    return buffer.array();
 	}
 	
 }

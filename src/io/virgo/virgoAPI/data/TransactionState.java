@@ -110,7 +110,10 @@ public class TransactionState {
 		
 		JSONRepresentation.put("uid", hash.toString());
 		JSONRepresentation.put("status", status.getCode());
-		JSONRepresentation.put("parentBeacon", beacon.toString());
+		if(beacon != null)
+			JSONRepresentation.put("beacon", beacon.toString());
+		else
+			JSONRepresentation.put("beacon", "");
 		JSONRepresentation.put("confirmations", confirmations);
 
 		JSONArray outputsJSON = new JSONArray();
@@ -133,7 +136,13 @@ public class TransactionState {
 			outputs.put(output.getAddress(), output);
 		}
 		
-		return new TransactionState(new Sha256Hash(JSONRepresentation.getString("uid")), TxStatus.fromCode(JSONRepresentation.getInt("status")), new Sha256Hash(JSONRepresentation.getString("parentBeacon")), JSONRepresentation.getInt("confirmations"), outputs);
+		Sha256Hash beacon = null;
+		
+		if(!JSONRepresentation.getString("beacon").equals(""))
+			new Sha256Hash(JSONRepresentation.getString("beacon"));
+		
+		return new TransactionState(new Sha256Hash(JSONRepresentation.getString("uid")), TxStatus.fromCode(JSONRepresentation.getInt("status")),
+				beacon, JSONRepresentation.getInt("confirmations"), outputs);
 	}
 	
 }

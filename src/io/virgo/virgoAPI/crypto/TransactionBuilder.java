@@ -20,7 +20,6 @@ import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
-import io.virgo.virgoCryptoLib.Utils;
 
 /**
  * Builder to create a new transaction
@@ -39,8 +38,8 @@ import io.virgo.virgoCryptoLib.Utils;
 public class TransactionBuilder {
 
 	private Address address = null;
-	private ArrayList<String> parents = new ArrayList<String>();
-	private ArrayList<String> inputs = new ArrayList<String>();
+	private ArrayList<Sha256Hash> parents = new ArrayList<Sha256Hash>();
+	private ArrayList<Sha256Hash> inputs = new ArrayList<Sha256Hash>();
 	private HashMap<String, TxOutput> outputs = new HashMap<String, TxOutput>();
 	
 	private boolean validateAmounts = true;
@@ -70,10 +69,8 @@ public class TransactionBuilder {
 	 * @param txId The transaction to add as parent
 	 * @return The current TransactionBuilder
 	 */
-	public TransactionBuilder parent(String txId) {
-		assert(Utils.validateAddress(txId, VirgoAPI.TX_IDENTIFIER));
-		
-		parents.add(txId);
+	public TransactionBuilder parent(Sha256Hash txHash) {		
+		parents.add(txHash);
 		
 		return this;
 	}
@@ -87,10 +84,8 @@ public class TransactionBuilder {
 	 * @param txId The transaction to add as input
 	 * @return The current TransactionBuilder
 	 */
-	public TransactionBuilder input(String txId) {
-		assert(Utils.validateAddress(txId, VirgoAPI.TX_IDENTIFIER));
-		
-		inputs.add(txId);
+	public TransactionBuilder input(Sha256Hash txHash) {		
+		inputs.add(txHash);
 		
 		return this;
 	}
@@ -148,7 +143,7 @@ public class TransactionBuilder {
 		//From states, calculate how much is spendable
 		long inputsValue = 0;
 		
-		ArrayList<String> unspentInputs = new ArrayList<String>();
+		ArrayList<Sha256Hash> unspentInputs = new ArrayList<Sha256Hash>();
 		
 		if(inputs.size() == 0) {
 			
@@ -179,8 +174,8 @@ public class TransactionBuilder {
 					
 					inputsValue += state.getOutput(address.getAddress()).getAmount();
 					
-					if(!unspentInputs.contains(state.getUid()))
-						unspentInputs.add(state.getUid());
+					if(!unspentInputs.contains(state.getHash()))
+						unspentInputs.add(state.getHash());
 					
 					if(inputsValue >= outputsValue)
 						break;
@@ -205,7 +200,7 @@ public class TransactionBuilder {
 		//amounts verification process, make sure we don't try to spend more than allowed and that we are not paying more fees than needed
 		if(validateAmounts) {
 			//Get inputs states
-			GetTxsStateResponse txsStateResp = VirgoAPI.getInstance().getTxsState(inputs.toArray(new String[inputs.size()]));
+			GetTxsStateResponse txsStateResp = VirgoAPI.getInstance().getTxsState(inputs.toArray(new Sha256Hash[inputs.size()]));
 			
 			if(txsStateResp.getResponseCode() != ResponseCode.OK)
 				throw new IOException("Unable to get transactions states from remote");
@@ -223,7 +218,7 @@ public class TransactionBuilder {
 							if(status.isPending())
 								continue statesFor;
 						
-						unspentInputs.add(state.getUid());
+						unspentInputs.add(state.getHash());
 						inputsValue += output.getAmount();
 					}				
 				}catch(IllegalArgumentException e) {
@@ -253,10 +248,18 @@ public class TransactionBuilder {
 			parents.addAll(getTipsResp.getTips());
 		}
 		
+		JSONArray parentsJSON = new JSONArray();
+		for(Sha256Hash parentHash : parents)
+			parentsJSON.put(parentHash.toString());
+		
+		JSONArray inputsJSON = new JSONArray();
+		for(Sha256Hash inputHash : unspentInputs)
+			inputsJSON.put(inputHash.toString());
+		
 		//Create the transaction JSON
 		JSONObject transaction = new JSONObject();
-		transaction.put("parents", new JSONArray(parents));
-		transaction.put("inputs", new JSONArray(unspentInputs));
+		transaction.put("parents", parentsJSON);
+		transaction.put("inputs", inputsJSON);
 		
 		JSONArray outputsJSON = new JSONArray();
 		for(TxOutput output : outputs.values()) {
@@ -268,13 +271,16 @@ public class TransactionBuilder {
 		
 		transaction.put("date", date);
 		
-		transaction.put("pubKey", Converter.bytesToHex(address.getPublicKey(privateKey)));
+		byte[] pubKey = address.getPublicKey(privateKey); 
 		
-		Sha256Hash txHash = Sha256.getDoubleHash((transaction.getJSONArray("parents").toString() +
+		transaction.put("pubKey", Converter.bytesToHex(pubKey));
+		
+		Sha256Hash txHash = Sha256.getDoubleHash(Converter.concatByteArrays((transaction.getJSONArray("parents").toString() +
 				transaction.getJSONArray("inputs").toString() +
-				outputsJSON.toString() + 
-				date)
-				.getBytes());
+				outputsJSON.toString()).getBytes(),
+				pubKey,
+				Converter.longToBytes(date)
+				));
 		
 		//Sign transaction
 		ECDSASignature sig = address.sign(txHash, privateKey);

@@ -144,60 +144,57 @@ public class VirgoAPI {
 		//remove duplicate entries from wanted transactions
 		txsHashes = new ArrayList<Sha256Hash>(new HashSet<Sha256Hash>(txsHashes));
 		
-		//First check if given ids are valid, if not return 400 BAD_REQUEST
-		for(String txId : txsIds)
-			if(!Utils.validateAddress(txId, VirgoAPI.TX_IDENTIFIER))
-			return new GetTransactionsResponse(ResponseCode.BAD_REQUEST, new HashMap<String, Transaction>());
-		
 		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
 		
-		HashMap<String, Transaction> foundTransactions = new HashMap<String, Transaction>();
+		HashMap<Sha256Hash, Transaction> foundTransactions = new HashMap<Sha256Hash, Transaction>();
 		
 		//if one wanted transaction is genesis get it without consulting peers as it's hardcoded
-		if(txsIds.contains("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN")) {
+		Sha256Hash genesisHash = new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a");
+		if(txsHashes.contains(genesisHash)) {
 			HashMap<String, TxOutput> genesisOutputs = new HashMap<String, TxOutput>();
 			genesisOutputs.put("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv",(long) (100000 * Math.pow(10, DECIMALS))));
 			
-			foundTransactions.put("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN", new Transaction("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN",null,null,new String[0],new String[0], genesisOutputs, "", 0, 0));
-			txsIds.remove("TXfxpq19sBUFgd8LRcUgjg1NdGK2ZGzBBdN");
+			foundTransactions.put(genesisHash,
+					new Transaction(genesisHash,null,null,new Sha256Hash[0],new Sha256Hash[0], genesisOutputs, null, null, 0));
+			txsHashes.remove(genesisHash);
 		}
 		
 		
 		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
-		while(providers.hasNext() && !foundTransactions.keySet().containsAll(txsIds)) {
+		while(providers.hasNext() && !foundTransactions.keySet().containsAll(txsHashes)) {
 			Provider provider = providers.next();
 			
-			for(String txId : txsIds) {
-				if(foundTransactions.containsKey(txId))
+			for(Sha256Hash txHash : txsHashes) {
+				if(foundTransactions.containsKey(txHash))
 					continue;
 				
-				Response resp = provider.get("/tx/"+txId);
+				Response resp = provider.get("/tx/"+txHash.toString());
 				
 				if(resp.getResponseCode().equals(ResponseCode.OK)) {
 					
 					try {
 						JSONObject txJson = new JSONObject(resp.getResponse());
 						
-						String receivedTxUid;
+						Sha256Hash receivedTxHash;
 						
 						if(txJson.has("parentBeacon"))
-							receivedTxUid = Converter.Addressify(Sha256.getDoubleHash((txJson.getJSONArray("parents").toString()
-									+ txJson.getJSONArray("outputs").toString()
-									+ txJson.getString("parentBeacon")
-									+ txJson.getLong("date")
-									+ txJson.getLong("nonce")).getBytes()).toBytes(), TX_IDENTIFIER);
+							receivedTxHash = Sha256.getDoubleHash(Converter.concatByteArrays((txJson.getJSONArray("parents").toString() + txJson.getJSONArray("outputs").toString()).getBytes(),
+									new Sha256Hash(txJson.getString("parentBeacon")).toBytes(), Converter.longToBytes(txJson.getLong("date")), Converter.hexToBytes(txJson.getString("nonce"))));
+							
 						else
-							receivedTxUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), VirgoAPI.TX_IDENTIFIER);
+							receivedTxHash = Sha256.getDoubleHash(Converter.concatByteArrays(
+									(txJson.getJSONArray("parents").toString() + txJson.getJSONArray("inputs").toString() + txJson.getJSONArray("outputs").toString()).getBytes()
+									, Converter.hexToBytes(txJson.getString("pubKey")), Converter.longToBytes(txJson.getLong("date"))));
 						
 						//check if given transaction is desired
-						if(txsIds.contains(receivedTxUid) && !foundTransactions.containsKey(txId)) {
+						if(txsHashes.contains(receivedTxHash) && !foundTransactions.containsKey(receivedTxHash)) {
 
 							Transaction tx = Transaction.fromJSONObject(txJson);
 							if(tx != null)
-								foundTransactions.put(receivedTxUid, tx);
+								foundTransactions.put(receivedTxHash, tx);
 							
 						}
-					}catch(JSONException e) {}
+					}catch(Exception e) {}
 					
 				}
 			}
@@ -207,7 +204,7 @@ public class VirgoAPI {
 			return new GetTransactionsResponse(ResponseCode.OK, foundTransactions);
 		
 		//If nothing has been returned yet return 404 NOT FOUND error
-		return new GetTransactionsResponse(ResponseCode.NOT_FOUND, new HashMap<String, Transaction>());
+		return new GetTransactionsResponse(ResponseCode.NOT_FOUND, new HashMap<Sha256Hash, Transaction>());
 		
 	}
 	
@@ -218,7 +215,7 @@ public class VirgoAPI {
 	 * @param addresses An array of the addresses to fetch
 	 * @return {@link GetAddressesTxsResponse} Containing the transactions IDs corresponding to each addresses
 	 */
-	public GetAddressesTxsResponse getAddressesTransactions(String[] addresses, int perPage, int page, String type) {
+	private GetAddressesTxsResponse getAddressesTransactions(String[] addresses, int perPage, int page, String type) {
 		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
 		
 		//Check if every given address is valid, if not throw an illegalArgumentException
@@ -247,15 +244,14 @@ public class VirgoAPI {
 						
 						JSONArray transactionsJSON = respJSON.getJSONArray(type);
 						
-						ArrayList<String> transactions = new ArrayList<String>();
+						ArrayList<Sha256Hash> transactions = new ArrayList<Sha256Hash>();
 						for(int i = 0; i < transactionsJSON.length(); i++) {
-							String tx = transactionsJSON.getString(i);
-							if(!Utils.validateAddress(tx, VirgoAPI.TX_IDENTIFIER))
+							try {
+								transactions.add(new Sha256Hash(transactionsJSON.getString(i)));
+							}catch(Exception e) {
 								break;
-							
-							transactions.add(tx);
+							}
 						}
-						
 						
 						if(transactions.size() == transactionsJSON.length())
 							addressesTxsMap.put(address, new AddressTxs(address, transactions, respJSON.getInt("size")));
@@ -364,27 +360,18 @@ public class VirgoAPI {
 	 * @return {@link GetTxsStateResponse} Containing the states of each transactions
 	 */
 	//TODO: Refactor, states shouldn't be got from different sources? not found states must be marked as not found, not fake data
-	public GetTxsStateResponse getTxsState(String[] txsUids) {
+	public GetTxsStateResponse getTxsState(Sha256Hash[] txsHashes) {
 		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
-		
-		ArrayList<String> wantedTransactions = new ArrayList<String>();
-		
-		//check if every transaction id is valid
-		for(String txUid : txsUids) {
-			if(!Utils.validateAddress(txUid, TX_IDENTIFIER))
-				throw new IllegalArgumentException(txUid + " is not a valid transaction identifier");
-			wantedTransactions.add(txUid);
-		}
 		
 		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
 		while(providers.hasNext()) {
 			Provider provider = providers.next();
 		
-			HashMap<String, TransactionState> states = new HashMap<String, TransactionState>();
-
-			for(String transaction : wantedTransactions) {
+			HashMap<Sha256Hash, TransactionState> states = new HashMap<Sha256Hash, TransactionState>();
+			
+			for(Sha256Hash transaction : txsHashes) {
 				
-				Response resp = provider.get("/tx/"+transaction+"/state");
+				Response resp = provider.get("/tx/"+transaction.toString()+"/state");
 				
 				if(resp.getResponseCode() == ResponseCode.OK) {
 					
@@ -399,10 +386,10 @@ public class VirgoAPI {
 								JSONObject outputState = outputsState.getJSONObject(i);
 								JSONArray claimersJSON = outputState.getJSONArray("claimers");
 								
-								HashMap<String, TxStatus> claimers = new HashMap<String, TxStatus>();
+								HashMap<Sha256Hash, TxStatus> claimers = new HashMap<Sha256Hash, TxStatus>();
 								for(int i2 = 0; i2 < claimersJSON.length(); i2++) {
 									JSONObject claimer = claimersJSON.getJSONObject(i2);
-									claimers.put(claimer.getString("id"), TxStatus.fromCode(claimer.getInt("status")));
+									claimers.put(new Sha256Hash(claimer.getString("id")), TxStatus.fromCode(claimer.getInt("status")));
 								}
 								
 								TxOutput output = new TxOutput(outputState.getString("address"), outputState.getLong("amount"), outputState.getBoolean("spent"), claimers);
@@ -411,24 +398,24 @@ public class VirgoAPI {
 							
 							int confirmations = state.getInt("confirmations");
 							
-							String beacon = null;
+							Sha256Hash beacon = null;
 							
 							if(confirmations > 0) {
-								beacon = state.getString("beacon");
-								if(!Utils.validateAddress(beacon, TX_IDENTIFIER))
-									break;
+								beacon = new Sha256Hash(state.getString("beacon"));
 							}
 							
 							states.put(transaction, new TransactionState(transaction, TxStatus.fromCode(state.getInt("status")), beacon, confirmations, outputsStateMap));
 						}else break;
 						
-					}catch(JSONException e) {}
+					}catch(Exception e) {
+						break;
+					}
 					
 				}
 				
 			}
 			
-			if(states.size() == wantedTransactions.size())
+			if(states.size() == txsHashes.length)
 				return new GetTxsStateResponse(ResponseCode.OK, states);
 		}
 		
@@ -453,24 +440,24 @@ public class VirgoAPI {
 					
 					JSONArray parentsJSON = respJSON.getJSONArray("parentTxs");
 					
-					ArrayList<String> parents = new ArrayList<String>();
+					ArrayList<Sha256Hash> parents = new ArrayList<Sha256Hash>();
 					for(int i = 0; i < parentsJSON.length(); i++)
-						parents.add(parentsJSON.getString(i));
+						parents.add(new Sha256Hash(parentsJSON.getString(i)));
 					
 					GetPoWInformationsResponse informations = new GetPoWInformationsResponse(ResponseCode.OK,
-							respJSON.getString("parentBeacon"),
-							respJSON.getString("key"),
+							new Sha256Hash(respJSON.getString("parentBeacon")),
+							new Sha256Hash(respJSON.getString("key")),
 							new BigInteger(respJSON.getString("difficulty")),
 							parents
 							);
 					
 					return informations;
 					
-				}catch(JSONException e) { }
+				}catch(Exception e) { }
 			}
 		}
 		
-		return new GetPoWInformationsResponse(ResponseCode.NOT_FOUND, "", "", BigInteger.ONE, null);
+		return new GetPoWInformationsResponse(ResponseCode.NOT_FOUND, null, null, BigInteger.ONE, null);
 		
 	}
 	

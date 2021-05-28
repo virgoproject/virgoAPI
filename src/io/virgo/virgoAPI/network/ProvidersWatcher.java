@@ -113,7 +113,7 @@ public class ProvidersWatcher {
 			
 			try{
 				JSONObject state = new JSONObject(resp.getResponse());
-				readyProviders.put(provider, state.getLong("DAGWeight"));
+				readyProviders.put(provider, state.getLong("BeaconChainWeight"));
 				pendingProviders.remove(provider);
 			}catch(JSONException e) {}
 			
@@ -134,7 +134,7 @@ public class ProvidersWatcher {
 				try {
 					
 					JSONObject state = new JSONObject(resp.getResponse());
-					readyProviders.replace(provider, state.getLong("DAGWeight"));
+					readyProviders.replace(provider, state.getLong("BeaconChainWeight"));
 					
 				}catch(JSONException e) {
 					readyProviders.remove(provider);
@@ -200,6 +200,8 @@ public class ProvidersWatcher {
 		readyProviders.remove(provider);
 		pendingProviders.remove(provider);
 		providersToCheck.remove(provider);
+		
+		System.out.println("removing " + hostname);
 	}
 	
 	public void shutdown() {
