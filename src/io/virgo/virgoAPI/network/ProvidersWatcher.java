@@ -73,7 +73,7 @@ public class ProvidersWatcher {
 	 */
 	public ArrayList<Provider> getProvidersByScore() {
 		List<Long> values = new ArrayList<Long>(readyProviders.values());
-		Collections.sort(values);
+		Collections.sort(values, Collections.reverseOrder());
 		
 		List<Provider> keys = new ArrayList<Provider>(readyProviders.keySet());
 		
