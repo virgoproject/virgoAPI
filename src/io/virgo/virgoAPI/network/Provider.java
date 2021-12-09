@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 
 public class Provider {
@@ -25,11 +26,13 @@ public class Provider {
 	public Response get(String method) {
 		try {
 			URL url = new URL(hostname + method);
-			HttpURLConnection connection = (HttpURLConnection)url.openConnection();
-			connection.connect();
+			URLConnection con = url.openConnection();
 			
-			if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-				BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+			HttpURLConnection httpConnection = (HttpURLConnection)con;
+			con.connect();
+			
+			if (httpConnection.getResponseCode() == HttpURLConnection.HTTP_OK) {
+				BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream()));
 
 	            String line;
 
@@ -42,7 +45,7 @@ public class Provider {
 	            
 	            return new Response(ResponseCode.OK, sb.toString());
 	            
-			} else if(connection.getResponseCode() == HttpURLConnection.HTTP_NOT_FOUND) {
+			} else if(httpConnection.getResponseCode() == HttpURLConnection.HTTP_NOT_FOUND) {
 	            return new Response(ResponseCode.NOT_FOUND, null);
 			}
 			
@@ -64,18 +67,19 @@ public class Provider {
 	public Response post(String method, String data) {
 		try {
 			URL url = new URL(hostname+method);
-			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-			conn.setFixedLengthStreamingMode(data.length());
-			conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-			conn.setDoOutput(true);
-			conn.connect();
-			try(OutputStream os = conn.getOutputStream()) {
+			URLConnection con = url.openConnection();
+			HttpURLConnection httpConnection = (HttpURLConnection) con;
+			httpConnection.setFixedLengthStreamingMode(data.length());
+			con.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+			con.setDoOutput(true);
+			con.connect();
+			try(OutputStream os = con.getOutputStream()) {
 			    os.write(data.getBytes(StandardCharsets.UTF_8));
 			}
 			
-			if(conn.getResponseCode() == HttpURLConnection.HTTP_OK)
+			if(httpConnection.getResponseCode() == HttpURLConnection.HTTP_OK)
 	            return new Response(ResponseCode.OK, null);
-			else if(conn.getResponseCode() == HttpURLConnection.HTTP_NOT_FOUND)
+			else if(httpConnection.getResponseCode() == HttpURLConnection.HTTP_NOT_FOUND)
 				return new Response(ResponseCode.NOT_FOUND, null);
 			
 			
