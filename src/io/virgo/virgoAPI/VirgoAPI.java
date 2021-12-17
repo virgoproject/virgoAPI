@@ -290,6 +290,14 @@ public class VirgoAPI {
 		return getAddressesTransactions(addresses, 100, 1, "inputs");
 	}
 	
+	public GetAddressesTxsResponse getAddressesUnspent(String[] addresses, int perPage, int page) {
+		return getAddressesTransactions(addresses, perPage, page, "unspent");
+	}
+	
+	public GetAddressesTxsResponse getAddressesUnspent(String[] addresses) {
+		return getAddressesTransactions(addresses, 100, 1, "unspent");
+	}
+	
 	public GetAddressesTxsResponse getAddressesTxs(String[] addresses, int perPage, int page) {
 		return getAddressesTransactions(addresses, perPage, page, "txs");
 	}

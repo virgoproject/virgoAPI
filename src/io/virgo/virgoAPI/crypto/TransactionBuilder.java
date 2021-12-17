@@ -152,7 +152,7 @@ public class TransactionBuilder {
 			while(inputsValue < outputsValue) {
 				//Get address transactions from peers
 				String[] addr = {address.getAddress()};
-				GetAddressesTxsResponse addrTxsResp = VirgoAPI.getInstance().getAddressesInputs(addr, 10, page);
+				GetAddressesTxsResponse addrTxsResp = VirgoAPI.getInstance().getAddressesUnspent(addr, 10, page);
 				
 				if(addrTxsResp.getResponseCode() != ResponseCode.OK)
 					throw new IOException("Unable to get address transactions from remote");
