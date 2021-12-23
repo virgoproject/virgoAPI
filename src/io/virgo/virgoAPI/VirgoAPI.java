@@ -16,6 +16,7 @@ import org.json.JSONObject;
 import io.virgo.virgoAPI.crypto.TxOutput;
 import io.virgo.virgoAPI.data.AddressBalance;
 import io.virgo.virgoAPI.data.AddressTxs;
+import io.virgo.virgoAPI.data.BeaconState;
 import io.virgo.virgoAPI.data.Transaction;
 import io.virgo.virgoAPI.data.TransactionState;
 import io.virgo.virgoAPI.data.TxStatus;
@@ -25,6 +26,9 @@ import io.virgo.virgoAPI.network.Response;
 import io.virgo.virgoAPI.network.ResponseCode;
 import io.virgo.virgoAPI.requestsResponses.GetAddressesTxsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetBalancesResponse;
+import io.virgo.virgoAPI.requestsResponses.GetBeaconsStateResponse;
+import io.virgo.virgoAPI.requestsResponses.GetLatestBeaconsResp;
+import io.virgo.virgoAPI.requestsResponses.GetLatestTxsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetPoWInformationsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTipsResponse;
 import io.virgo.virgoAPI.requestsResponses.GetTransactionsResponse;
@@ -131,6 +135,117 @@ public class VirgoAPI {
 		
 		//If nothing has been returned yet return 404 NOT FOUND error
 		return new GetTipsResponse(ResponseCode.NOT_FOUND, null);
+	}
+	
+	/**
+	 * Get latest beacons from peers<br>
+	 * Will only return result from the most up-to-date peer
+	 * 
+	 * @return {@link GetLatestBeaconsResp} containing the request result
+	 */
+	public GetLatestBeaconsResp getLatestBeacons() {
+		return getLatestBeacons(10);
+	}
+	
+	/**
+	 * Get beacon beacons from peers<br>
+	 * Will only return result from the most up-to-date peer
+	 * 
+	 * @param wanted the amount of beacons you want, up to 1000
+	 * @return {@link GetLatestBeaconsResp} containing the request result
+	 */
+	public GetLatestBeaconsResp getLatestBeacons(int wanted) {
+		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
+		
+		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
+		while(providers.hasNext()) {
+			Provider provider = providers.next();
+			
+			//send request
+			Response resp = provider.get("/beacon/latest/"+wanted);
+			if(resp.getResponseCode() == ResponseCode.OK) {
+				
+				//if got a response check for data validity
+				try {
+					ArrayList<Sha256Hash> responseBeacons = new ArrayList<Sha256Hash>();
+					JSONArray beaconsJSON = new JSONArray(resp.getResponse());
+					
+					for(int i = 0; i < beaconsJSON.length(); i++) {
+						try {
+							responseBeacons.add(new Sha256Hash(beaconsJSON.getString(i)));
+						}catch(IllegalArgumentException e) {
+							break;
+						}
+					}
+					
+					//if everything is good return peer response, else goto next iteration
+					if(!responseBeacons.isEmpty())
+						return new GetLatestBeaconsResp(ResponseCode.OK, responseBeacons);
+					
+				}catch(JSONException e) { }
+				
+			}
+			
+		}
+		
+		//If nothing has been returned yet return 404 NOT FOUND error
+		return new GetLatestBeaconsResp(ResponseCode.NOT_FOUND, null);
+	}
+	
+	
+	/**
+	 * Get latest transactions from peers<br>
+	 * Will only return result from the most up-to-date peer
+	 * 
+	 * @return {@link GetLatestTxsResponse} containing the request result
+	 */
+	public GetLatestTxsResponse getLatestTxs() {
+		return getLatestTxs(10);
+	}
+	
+	/**
+	 * Get tips transactions from peers<br>
+	 * Will only return result from the most up-to-date peer
+	 * 
+	 * @param wanted the amount of transactions you want, up to 1000
+	 * @return {@link GetLatestTxsResponse} containing the request result
+	 */
+	public GetLatestTxsResponse getLatestTxs(int wanted) {
+		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
+		
+		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
+		while(providers.hasNext()) {
+			Provider provider = providers.next();
+			
+			//send request
+			Response resp = provider.get("/tx/latest/"+wanted);
+			if(resp.getResponseCode() == ResponseCode.OK) {
+				
+				//if got a response check for data validity
+				try {
+					ArrayList<Sha256Hash> responseTxs = new ArrayList<Sha256Hash>();
+					JSONArray txsJSON = new JSONArray(resp.getResponse());
+					
+					for(int i = 0; i < txsJSON.length(); i++) {
+						try {
+							responseTxs.add(new Sha256Hash(txsJSON.getString(i)));
+						}catch(IllegalArgumentException e) {
+							break;
+						}
+					}
+					
+					//if everything is good return peer response, else goto next iteration
+					if(!responseTxs.isEmpty())
+						return new GetLatestTxsResponse(ResponseCode.OK, responseTxs);
+					
+				}catch(JSONException e) { }
+				
+			}
+			
+		}
+		
+		//If nothing has been returned yet return 404 NOT FOUND error
+		return new GetLatestTxsResponse(ResponseCode.NOT_FOUND, null);
 	}
 	
 	/**
@@ -362,12 +477,48 @@ public class VirgoAPI {
 	
 	
 	/**
+	 * Get given beacons states 
+	 * 
+	 * @param txsUids the IDs of the beacons you want the state of
+	 * @return {@link GetBeaconsStateResponse} Containing the states of each beacons
+	 */
+	public GetBeaconsStateResponse getBeaconsState(Sha256Hash[] beaconsHashes) {
+		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
+		
+		//Loop through all peers, starting from the one with highest score (probably most up-to-date)
+		while(providers.hasNext()) {
+			Provider provider = providers.next();
+		
+			HashMap<Sha256Hash, BeaconState> states = new HashMap<Sha256Hash, BeaconState>();
+			
+			for(Sha256Hash hash : beaconsHashes) {
+				
+				Response resp = provider.get("/beacon/"+hash.toString());
+				
+				if(resp.getResponseCode() == ResponseCode.OK) {
+					
+					BeaconState state = BeaconState.fromJSON(hash, new JSONObject(resp.getResponse()));
+					if(state != null)
+						states.put(hash, state);
+					else break;
+					
+				}
+				
+			}
+			
+			if(states.size() == beaconsHashes.length)
+				return new GetBeaconsStateResponse(ResponseCode.OK, states);
+		}
+		
+		return new GetBeaconsStateResponse(ResponseCode.NOT_FOUND, null);
+	}
+	
+	/**
 	 * Get given transactions states (Status, stability, outputs states and values)
 	 * 
 	 * @param txsUids the IDs of the transactions you want the state of
 	 * @return {@link GetTxsStateResponse} Containing the states of each transactions
 	 */
-	//TODO: Refactor, states shouldn't be got from different sources? not found states must be marked as not found, not fake data
 	public GetTxsStateResponse getTxsState(Sha256Hash[] txsHashes) {
 		Iterator<Provider> providers = getProvidersWatcher().getProvidersByScore().iterator();
 		

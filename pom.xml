@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>VirgoAPI</groupId>
   <artifactId>VirgoAPI</artifactId>
-  <version>0.0.8</version>
+  <version>0.1.0</version>
   <build>
     <sourceDirectory>src</sourceDirectory>
     <plugins>
